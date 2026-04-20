@@ -641,9 +641,6 @@ git clone https://github.com/lizhenliang/ansible-install-k8s
 cd ansible-install-k8s
 ```
 
-下载软件包并解压：
-
-云盘地址：https://pan.baidu.com/s/1lTXolmlcCJbei9HY2BJRPQ
 ```
 tar zxf binary_pkg.tar.gz
 ```
