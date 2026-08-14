@@ -30,24 +30,31 @@
 
 ## 当前状态
 
-当前仓库仍处于**部署教程与自动化方案基线**阶段：
+B0「兼容矩阵与安全基线」于 **2026-08-14** 完成：
 
-- 已有单节点、HA 和 Ansible 部署路径的文档整理；
-- GitHub Actions 当前只做 Markdown 链接检查；
-- 仓库尚未提供完整的 `inventory/`、`roles/`、`playbooks/` 自动化实现；
-- 现有文档包含历史版本和实验环境命令，不能直接视为当前生产部署合同；
-- “生产高可用”“一键部署”等能力，待自动化脚本、幂等复跑和真实多节点验收完成后再恢复声明。
+- 已确立第一条正式支持的集群交付组合：Ubuntu 24.04 LTS + Kubernetes 1.36 + containerd 2.3 LTS + Calico + Ansible Core 2.21，详见 [`docs/compatibility.md`](./docs/compatibility.md)；
+- 三篇历史教程均标注为**历史材料**，与当前重建路线解耦；
+- 新增实验环境合同（[`docs/lab-environment.md`](./docs/lab-environment.md)）与安全基线（[`docs/security-boundaries.md`](./docs/security-boundaries.md)）；
+- 新增 `.gitignore` 覆盖 Kubernetes、Ansible 与实验日志敏感产物；
+- CI 扩展为 Markdown 链接检查 + 格式检查 + 敏感字段/危险示例扫描；
+- 仓库扫描不到可复用 Token、明文密码、私钥或真实节点地址，危险示例仅以明确允许清单豁免、可审查。
+
+> B0 是文档与门禁阶段，**不宣称已完成真实多节点安装验收**；多节点验收与
+> 完整 Ansible 自动化属于 [B1-B4](#重建路线) 后续里程碑。
 
 ## 文档入口
 
 | 文档 | 当前用途 |
 |---|---|
-| [kubeadm 单节点部署](./使用kubeadm快速部署一个K8s集群.md) | 学习和测试环境的手动部署参考 |
-| [kubeadm 高可用部署](./使用kubeadm搭建高可用的K8s集群.md) | HA 拓扑和组件配置的历史实践参考 |
-| [Ansible 自动化部署](./Ansible自动化部署K8S集群.md) | Ansible 概念、Inventory 和 Playbook 设计参考 |
+| [兼容矩阵](./docs/compatibility.md) | B0：第一条支持路径、版本关系、HA 与升级状态（**当前文档**） |
+| [实验环境合同](./docs/lab-environment.md) | B0：拓扑、网络/镜像前提、销毁与脱敏规则（**当前文档**） |
+| [安全基线](./docs/security-boundaries.md) | B0：禁止项、凭据生命周期、端口/SSH 与 .gitignore 规则（**当前文档**） |
+| [kubeadm 单节点部署](./使用kubeadm快速部署一个K8s集群.md) | 历史教程：学习与测试环境的手动部署复盘 |
+| [kubeadm 高可用部署](./使用kubeadm搭建高可用的K8s集群.md) | 历史教程：HA 拓扑和组件配置复盘 |
+| [Ansible 自动化部署](./Ansible自动化部署K8S集群.md) | 历史教程：Ansible 概念、Inventory 和 Playbook 学习参考 |
 
-旧文档中的 Kubernetes、Docker、操作系统和镜像版本可能已经过时，执行前必须根据兼容矩阵复核。
-文档中的 IP、Token、密码和示例凭据只能作为占位符，不能复制到真实环境。
+旧教程中的 Kubernetes、Docker、操作系统和镜像版本均属历史参考，**不得**按旧文档执行；
+执行前必须根据 [`docs/compatibility.md`](./docs/compatibility.md) 复核。
 
 ## 安全与兼容性警示
 
@@ -61,13 +68,13 @@
 
 ## 重建路线
 
-### B0：兼容矩阵与安全清理
+### ~~B0：兼容矩阵与安全清理~~（已完成 2026-08-14）
 
-- 固定首个支持的 Linux 发行版和 Kubernetes minor 版本；
-- 从 Docker 迁移到 containerd 的当前推荐路径；
-- 清理硬编码 Token、Keepalived 密码、真实拓扑地址和旧镜像源；
-- 不再使用 `gpgcheck=0`、无条件关闭防火墙 / SELinux 等危险示例；
-- 增加 `compatibility.md` 和明确的实验环境边界。
+- ✅ 固定首个支持路径：Ubuntu 24.04 + K8s 1.36.2 + containerd 2.3 + Calico + Ansible Core 2.21（[`docs/compatibility.md`](./docs/compatibility.md)）
+- ✅ 实验环境合同与销毁边界（[`docs/lab-environment.md`](./docs/lab-environment.md)）
+- ✅ 安全基线、凭据生命周期与 `.gitignore`（[`docs/security-boundaries.md`](./docs/security-boundaries.md)）
+- ✅ 历史教程治理：三篇教程标注为历史材料，旧版本标记为「历史参考」
+- ✅ CI 扩展：链接检查 + 格式检查 + 敏感字段/危险示例扫描
 
 ### B1：真实 Ansible 交付结构
 

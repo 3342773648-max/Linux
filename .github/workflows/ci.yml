@@ -15,3 +15,7 @@ jobs:
           python-version: "3.12"
       - name: Check markdown links
         run: python .github/scripts/check_markdown_links.py
+      - name: Check markdown style
+        run: python .github/scripts/check_markdown_style.py
+      - name: Scan sensitive fields and dangerous examples
+        run: python .github/scripts/scan_sensitive.py

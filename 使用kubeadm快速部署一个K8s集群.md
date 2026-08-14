@@ -5,6 +5,20 @@
 > 和 Kubernetes 1.18 路径，不能直接作为生产部署脚本。文档中的地址和 join 参数均为占位示例；
 > 不要复用 Token、证书哈希或镜像加速地址，也不要无条件关闭防火墙 / SELinux 或关闭仓库签名校验。
 
+## 历史版本清单
+
+本文所有组件与来源均属**历史参考**，当前支持路径以 [`docs/compatibility.md`](./docs/compatibility.md) 为准：
+
+| 组件 | 本文版本 | 状态（2026-08-14） |
+| --- | --- | --- |
+| 操作系统 | CentOS 7.x（已 EOL） | 历史参考 |
+| 容器运行时 | Docker 18.06.1（dockershim 自 1.24 移除） | 历史参考 → 当前为 containerd |
+| Kubernetes | 1.18.0（EOL 2021-06-18） | 历史参考 → 当前为 1.36 |
+| 软件源 | 阿里云 YUM 源 | 历史参考 → 当前为官方源 + 签名校验 |
+| 镜像仓库 | registry.aliyuncs.com/google_containers | 历史参考 → 当前默认 registry.k8s.io |
+| CNI | flannel（`coreos/flannel` master URL） | 历史参考 → 当前首选 Calico |
+| join 方式 | 固定 Token / 证书哈希示例 | 历史参考 → 现场生成、短时有效 |
+
 kubeadm 是官方社区推出的一个用于快速部署 Kubernetes 集群的工具。
 
 这个工具能通过两条指令完成一个kubernetes集群的部署：
@@ -178,7 +192,4 @@ $ kubectl expose deployment nginx --port=80 --type=NodePort
 $ kubectl get pod,svc
 ```
 
-访问地址：http://NodeIP:Port  
-
-
-
+访问地址：http://NodeIP:Port

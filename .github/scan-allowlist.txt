@@ -1,0 +1,13 @@
+# 敏感扫描允许清单（B0）
+# 格式：文件相对路径::整行完整匹配的正则::原因
+# 规则：只允许「文件 + 整行」精确豁免；禁止目录级宽泛排除；变更随 PR 可见并可审查。
+# 本文件自身不参与扫描，由 `.github/scripts/scan_sensitive.py` 跳过。
+
+# security-boundaries.md 第 1 节以字面形式说明「关闭仓库签名校验」危险示例，必须允许。
+docs/security-boundaries.md::\| 关闭软件仓库签名验证 \|.*::security-boundaries.md 第 1 节禁止项表中按字面说明 gpgcheck=0 / repo_gpgcheck=0 危险示例
+
+# lab-environment.md 第 5 节在软件源前提中说明禁止关闭签名验证。
+docs/lab-environment.md::.*禁止 `gpgcheck=0` 或.*::lab-environment.md 第 5 节，软件仓库必须保持签名校验开启的说明
+
+# security-boundaries.md 第 7 节扫描项清单中按字面说明 gpgcheck=0 变体扫描规则，是扫描器行为的正式描述。
+docs/security-boundaries.md::- 扫描项：.*::security-boundaries.md 第 7 节扫描项清单，按字面描述 gpgcheck=0 / repo_gpgcheck=0 变体扫描规则

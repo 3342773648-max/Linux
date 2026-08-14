@@ -1,0 +1,45 @@
+# 本文件与 docs/security-boundaries.md 第 6 节保持一致，新增敏感产物类型时两处同步更新。
+
+# Kubernetes / kubeadm 敏感产物
+*.kubeconfig
+kubeconfig
+.kube/
+**/admin.conf
+**/super-admin.conf
+**/pki/
+*.crt
+*.key
+*.csr
+*.pem
+*.token
+join-command.txt
+certificate-key.txt
+
+# Ansible 凭据与 Inventory Secret
+inventory/**/secrets.yml
+inventory/**/vault.yml
+vault_pass*
+*.vault
+.ansible-vault
+
+# 实验产物与日志
+artifacts/
+logs/
+*.log
+
+# Python / Node（CI 与本地工具）
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+node_modules/
+dist/
+
+# IDE / 系统
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+*.swp
+*.tmp

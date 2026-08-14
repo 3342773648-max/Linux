@@ -4,6 +4,21 @@
 > 可直接执行的 `inventory/`、`roles/`、`playbooks/` 交付实现。示例地址、用户和密钥路径均为占位符；
 > 不要把密码写入 Inventory，不要提交 kubeconfig 或私钥，也不要无条件关闭防火墙 / SELinux。
 
+## 历史版本清单
+
+本文所有组件与来源均属**历史参考**，当前支持路径以 [`docs/compatibility.md`](./docs/compatibility.md) 为准：
+
+| 组件 | 本文版本 | 状态（2026-08-14） |
+| --- | --- | --- |
+| 操作系统 | CentOS 7.x（已 EOL） | 历史参考 |
+| 容器运行时 | Docker 18.x（dockershim 自 1.24 移除） | 历史参考 → 当前为 containerd |
+| Kubernetes | 二进制 1.16.3（EOL 2020-09-02） | 历史参考 → 当前为 1.36 + kubeadm |
+| Ansible | yum 时代 Ansible 2.9（已 EOL） | 历史参考 → 当前为 ansible-core 2.21 |
+| 参考仓库 | lizhenliang/ansible-install-k8s | 历史参考 → 当前为本仓库 B1 Ansible 交付结构 |
+| 软件源 | 阿里云 YUM 源 / COS 图片 | 历史参考 → 当前为官方源 + 签名校验 |
+| CNI | Flannel | 历史参考 → 当前首选 Calico |
+| 学习价值 | Ansible 基础概念、Inventory/Playbook/Role 模式 | 保留，作为 Ansible 入门参考 |
+
 # 一、Ansible 自动化部署 K8S 集群
 
 ## 1.1 Ansible介绍
@@ -12,11 +27,11 @@ Ansible是一种IT自动化工具。它可以配置系统，部署软件以及�
 
 具备以下三个特点：
 
- - 简单：减少学习成本   
- - 强大：协调应用程序生命周期 
+ - 简单：减少学习成本
+ - 强大：协调应用程序生命周期
  - 无代理：可预测，可靠和安全
 
-使用文档： https://docs.ansible.com/ 
+使用文档： https://docs.ansible.com/
 
 安装Ansible：yum install ansible -y
 
@@ -89,9 +104,9 @@ private_key_file = ~/.ssh/id_ed25519  # 示例路径，按本机密钥配置
 
 ### 3、命令行使用
 
-```ansible all -m ping
+```bash
 ansible all -m ping
-ansible all -m shell -a "ls /root" -u root -k 
+ansible all -m shell -a "ls /root" -u root -k
 ansible webservers -m copy –a "src=/etc/hosts dest=/tmp/hosts"
 ```
 
@@ -101,7 +116,7 @@ ansible-doc –l 查看所有模块
 
 ansible-doc –s copy 查看模块文档
 
- 模块文档：https://docs.ansible.com/ansible/latest/modules/modules_by_category.html 
+ 模块文档：https://docs.ansible.com/ansible/latest/modules/modules_by_category.html
 
 ### 1、shell
 
@@ -185,7 +200,7 @@ absent：表示卸载
 - name: 卸载apache包
   yum:
     name: httpd
-    state: absent 
+    state: absent
 - name: 更新所有包
   yum:
     name: '*'
@@ -216,11 +231,11 @@ absent：表示卸载
 ```
 
 ```
-- name: 服务管理  
-  systemd: 
-	name=etcd 
-	state=restarted 
-	enabled=yes 
+- name: 服务管理
+  systemd:
+	name=etcd
+	state=restarted
+	enabled=yes
 	daemon_reload=yes
 ```
 
@@ -228,8 +243,8 @@ absent：表示卸载
 
 ```
 - name: 解压
-  unarchive: 
-    src=test.tar.gz 
+  unarchive:
+    src=test.tar.gz
     dest=/tmp
 ```
 
@@ -288,7 +303,7 @@ https://docs.ansible.com/ansible/latest/user_guide/playbooks.html
   become_user: root
 ```
 
-ansible-playbook nginx.yaml -u ops -k -b -K 
+ansible-playbook nginx.yaml -u ops -k -b -K
 
 ### 2、定义变量
 
@@ -487,7 +502,7 @@ server {
 {% for host in groups['etcd'] %}
 	https://{{ hostvars[host].inventory_hostname }}:2379
 	{% if not loop.last %},{% endif %}
-{% endfor %} 
+{% endfor %}
 ```
 
 里面也可以用ansible的变量。
@@ -528,7 +543,6 @@ roles/
 - `meta`-为此角色定义一些元数据。请参阅下面的更多细节。
 
 
-
 通常的做法是从`tasks/main.yml`文件中包含特定于平台的任务：
 
 ```
@@ -563,13 +577,13 @@ roles/
 定义多个：
 - name: 0
   gather_facts: false
-  hosts: all 
+  hosts: all
   roles:
     - common
 
 - name: 1
   gather_facts: false
-  hosts: all 
+  hosts: all
   roles:
     - webservers
 ```
@@ -579,10 +593,10 @@ roles/
 ```
 - name: 0.系统初始化
   gather_facts: false
-  hosts: all 
+  hosts: all
   roles:
     - common
-  tags: common 
+  tags: common
 ```
 
 ## 1.7 自动化部署K8S（离线版）
@@ -625,7 +639,7 @@ roles/
    1. 增加Master节点（与Master1一致）
    2. 部署Nginx负载均衡器
    3. Nginx+Keepalived高可用
-   4. 修改Node连接VIP                            
+   4. 修改Node连接VIP
 
 
 ### 2、Roles组织K8S各组件部署解析
@@ -673,12 +687,12 @@ cert_hosts:
 
 ![](https://k8s-1252881505.cos.ap-beijing.myqcloud.com/k8s-2/single-master.jpg)
 
-​																				单Master架构
+ 单Master架构
 
 
 ![avatar](https://k8s-1252881505.cos.ap-beijing.myqcloud.com/k8s-2/multi-master.jpg)
 
-​																					多Master架构
+ 多Master架构
 
 **部署命令**
 单Master版：
@@ -698,7 +712,6 @@ ansible-playbook -i hosts multi-master-deploy.yml -u ops -k
 ```
 ansible-playbook -i hosts single-master-deploy.yml -u ops -k --tags addons
 ```
-
 
 
 示例参考：https://github.com/ansible/ansible-examples

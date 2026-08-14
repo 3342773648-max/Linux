@@ -5,6 +5,22 @@
 > 和 Kubernetes 1.16 路径，不能直接作为生产部署脚本。文档中的地址、Token、证书哈希和
 > Keepalived 密钥均为占位示例；不要无条件关闭防火墙 / SELinux 或关闭仓库签名校验。
 
+## 历史版本清单
+
+本文所有组件与来源均属**历史参考**，当前支持路径以 [`docs/compatibility.md`](./docs/compatibility.md) 为准：
+
+| 组件 | 本文版本 | 状态（2026-08-14） |
+| --- | --- | --- |
+| 操作系统 | CentOS 7.x（已 EOL） | 历史参考 |
+| 容器运行时 | Docker 18.06.1（dockershim 自 1.24 移除） | 历史参考 → 当前为 containerd |
+| Kubernetes | 1.16.3（EOL 2020-09-02） | 历史参考 → 当前为 1.36 |
+| kubeadm 配置 API | kubeadm.k8s.io/v1beta1 | 历史参考 → 当前配置沿用官方 v1beta4 及以上 |
+| HA 入口 | Keepalived＋HAProxy（PASS 口令、手工复制证书） | 历史参考 → kube-vip / 云 LB 为计划验证 |
+| 控制平面 join | scp 复制 PKI + `--control-plane` 固定示例 | 历史参考 → certificate-key 现场生成、安全通道传输 |
+| 软件源 | 阿里云 YUM 源 | 历史参考 → 当前为官方源 + 签名校验 |
+| 镜像仓库 | registry.aliyuncs.com/google_containers | 历史参考 → 当前默认 registry.k8s.io |
+| CNI | flannel（`coreos/flannel` master URL） | 历史参考 → 当前首选 Calico |
+
 kubeadm 是官方社区推出的一个用于快速部署 Kubernetes 集群的工具。
 
 这个工具能通过两条指令完成一个kubernetes集群的部署：
@@ -68,7 +84,6 @@ ntpdate time.windows.com
 ```
 
 
-
 ## 3. 所有master节点部署keepalived
 
 ### 3.1 安装相关包和keepalived
@@ -84,7 +99,7 @@ yum install -y keepalived
 master1节点配置
 
 ```
-cat > /etc/keepalived/keepalived.conf <<EOF 
+cat > /etc/keepalived/keepalived.conf <<EOF
 ! Configuration File for keepalived
 
 global_defs {
@@ -100,8 +115,8 @@ vrrp_script check_haproxy {
 }
 
 vrrp_instance VI_1 {
-    state MASTER 
-    interface ens33 
+    state MASTER
+    interface ens33
     virtual_router_id 51
     priority 250
     advert_int 1
@@ -123,7 +138,7 @@ EOF
 master2节点配置
 
 ```
-cat > /etc/keepalived/keepalived.conf <<EOF 
+cat > /etc/keepalived/keepalived.conf <<EOF
 ! Configuration File for keepalived
 
 global_defs {
@@ -139,8 +154,8 @@ vrrp_script check_haproxy {
 }
 
 vrrp_instance VI_1 {
-    state BACKUP 
-    interface ens33 
+    state BACKUP
+    interface ens33
     virtual_router_id 51
     priority 200
     advert_int 1
@@ -179,7 +194,6 @@ ip a s ens33
 ```
 
 
-
 ## 4. 部署haproxy
 
 ### 4.1 安装
@@ -210,20 +224,20 @@ global
     #    local2.*                       /var/log/haproxy.log
     #
     log         127.0.0.1 local2
-    
+
     chroot      /var/lib/haproxy
     pidfile     /var/run/haproxy.pid
     maxconn     4000
     user        haproxy
     group       haproxy
-    daemon 
-       
+    daemon
+
     # turn on stats unix socket
     stats socket /var/lib/haproxy/stats
 #---------------------------------------------------------------------
 # common defaults that all the 'listen' and 'backend' sections will
 # use if not designated in their block
-#---------------------------------------------------------------------  
+#---------------------------------------------------------------------
 defaults
     mode                    http
     log                     global
@@ -243,12 +257,12 @@ defaults
     maxconn                 3000
 #---------------------------------------------------------------------
 # kubernetes apiserver frontend which proxys to the backends
-#--------------------------------------------------------------------- 
+#---------------------------------------------------------------------
 frontend kubernetes-apiserver
     mode                 tcp
     bind                 *:16443
     option               tcplog
-    default_backend      kubernetes-apiserver    
+    default_backend      kubernetes-apiserver
 #---------------------------------------------------------------------
 # round robin balancing between the various backends
 #---------------------------------------------------------------------
@@ -287,7 +301,6 @@ $ systemctl status haproxy
 ```
 netstat -lntup|grep haproxy
 ```
-
 
 
 ## 5. 所有节点安装Docker/kubeadm/kubelet
@@ -336,7 +349,6 @@ $ systemctl enable kubelet
 ```
 
 
-
 ## 6. 部署Kubernetes Master
 
 ### 6.1 创建kubeadm配置文件
@@ -367,21 +379,20 @@ certificatesDir: /etc/kubernetes/pki
 clusterName: kubernetes
 controlPlaneEndpoint: "master.k8s.io:16443"
 controllerManager: {}
-dns: 
+dns:
   type: CoreDNS
 etcd:
-  local:    
+  local:
     dataDir: /var/lib/etcd
 imageRepository: registry.aliyuncs.com/google_containers
 kind: ClusterConfiguration
 kubernetesVersion: v1.16.3
-networking: 
-  dnsDomain: cluster.local  
+networking:
+  dnsDomain: cluster.local
   podSubnet: 10.244.0.0/16
   serviceSubnet: 10.1.0.0/16
 scheduler: {}
 ```
-
 
 
 ### 6.2 在master1节点执行
@@ -389,7 +400,6 @@ scheduler: {}
 ```
 $ kubeadm init --config kubeadm-config.yaml
 ```
-
 
 
 按照提示配置环境变量，使用kubectl工具：
@@ -403,13 +413,12 @@ $ kubectl get pods -n kube-system
 ```
 
 
-
 **按照提示保存当前环境生成的 join 命令；下面只展示参数形状：**
 
 ```bash
 kubeadm join master.k8s.io:16443 --token <BOOTSTRAP_TOKEN> \
     --discovery-token-ca-cert-hash sha256:<CA_CERT_HASH> \
-    --control-plane 
+    --control-plane
 ```
 
 查看集群状态
@@ -419,7 +428,6 @@ kubectl get cs
 
 kubectl get pods -n kube-system
 ```
-
 
 
 ## 7.安装集群网络
@@ -433,11 +441,10 @@ wget -c https://raw.githubusercontent.com/coreos/flannel/master/Documentation/ku
 ```
 
 
-
 安装flannel网络
 
 ```bash
-kubectl apply -f kube-flannel.yml 
+kubectl apply -f kube-flannel.yml
 ```
 
 检查
@@ -445,7 +452,6 @@ kubectl apply -f kube-flannel.yml
 ```bash
 kubectl get pods -n kube-system
 ```
-
 
 
 ## 8、master2节点加入集群
@@ -459,9 +465,9 @@ kubectl get pods -n kube-system
 # ssh root@198.51.100.12 mkdir -p /etc/kubernetes/pki/etcd
 
 # scp /etc/kubernetes/admin.conf root@198.51.100.12:/etc/kubernetes
-   
+
 # scp /etc/kubernetes/pki/{ca.*,sa.*,front-proxy-ca.*} root@198.51.100.12:/etc/kubernetes/pki
-   
+
 # scp /etc/kubernetes/pki/etcd/ca.* root@198.51.100.12:/etc/kubernetes/pki/etcd
 ```
 
@@ -481,9 +487,8 @@ kubectl get node
 kubectl get pods --all-namespaces
 ```
 
-## 
 
-## 5. 加入Kubernetes Node
+## 9. 加入 Worker 节点
 
 在node1上执行
 
@@ -503,9 +508,10 @@ kubectl get node
 kubectl get pods --all-namespaces
 ```
 
-## 
 
-## 7. 测试kubernetes集群
+## 10. 测试集群
+
+> 本节属于历史路径演示；当前验收流程见 README「重建路线」与 `docs/lab-environment.md`。
 
 在Kubernetes集群中创建一个pod，验证是否正常运行：
 
@@ -515,6 +521,4 @@ $ kubectl expose deployment nginx --port=80 --type=NodePort
 $ kubectl get pod,svc
 ```
 
-访问地址：http://NodeIP:Port  
-
-
+访问地址：http://NodeIP:Port
