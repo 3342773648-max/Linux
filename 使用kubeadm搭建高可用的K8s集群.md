@@ -1,6 +1,9 @@
 
 # kubeadm 高可用集群部署（历史实践）
 
+> **DO NOT USE FOR CURRENT DEPLOYMENT** — 历史教程，仅作复盘学习；
+> 当前支持路径见 [`docs/compatibility.md`](./docs/compatibility.md)。
+>
 > **安全与兼容性警示**：本文仅用于学习和实验环境复盘，使用的是历史 CentOS 7、Docker 18.x
 > 和 Kubernetes 1.16 路径，不能直接作为生产部署脚本。文档中的地址、Token、证书哈希和
 > Keepalived 密钥均为占位示例；不要无条件关闭防火墙 / SELinux 或关闭仓库签名校验。

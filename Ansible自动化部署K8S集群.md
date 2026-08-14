@@ -1,5 +1,8 @@
 # Ansible 自动化部署 K8S 集群（历史实践）
 
+> **DO NOT USE FOR CURRENT DEPLOYMENT** — 历史教程，仅作复盘学习；
+> 当前支持路径见 [`docs/compatibility.md`](./docs/compatibility.md)。
+>
 > **安全与兼容性警示**：本文是 Ansible 和 Kubernetes 集群交付的历史学习材料，当前仓库还没有
 > 可直接执行的 `inventory/`、`roles/`、`playbooks/` 交付实现。示例地址、用户和密钥路径均为占位符；
 > 不要把密码写入 Inventory，不要提交 kubeconfig 或私钥，也不要无条件关闭防火墙 / SELinux。

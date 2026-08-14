@@ -89,4 +89,28 @@ git status --short                                  # 仅本任务新增/修改�
 2. 实现 `inventory/`、`group_vars/`、`roles/`、`playbooks/` 的最小交付结构；
 3. 单控制平面 + Worker 完成真实安装验收（Node Ready、CoreDNS、Calico、Service/DNS、Pod 调度）；
 4. 第二次执行幂等、reset 可重复；
-5. 验收证据脱敏归档，凭据不落入 Git（由 `.gitignore` 与 CI 扫描守护）。
+5. 验收证据脱敏归档，凭据不落入 Git（由 `.gitignore` 与 CI 扫描守护）；
+6. 验证「命令成功」之外的运行时真实状态：cgroup v2 / systemd 驱动实际生效（reboot 后仍成立）、
+   kubelet 稳定、containerd CRI 正常、Pod sandbox 创建/删除正常；
+7. join 凭据生命周期、最小 SSH 权限与 become 边界落实为自动化控制措施，不因「一次跑通」回退。
+
+## 审查修正（2026-08-14，ChatGPT 交叉审查）
+
+实施初版经 ChatGPT 审查（结论：PASS WITH REQUIRED FIXES），已按 4 项必改与高价值 P1 项修正：
+
+- **状态语义**：「已确认」→「已确认（官方兼容，未实机验证）」，新增「官方兼容 → 项目选定 →
+  实机验证」三层模型；1.36.2 / 2.21.3 明确为「B1 首次验收锚点」，锚点 ≠ 当前最新 patch。
+- **完整性**：补 kube-proxy 版本偏差；升级顺序修正为 apiserver → controller-manager/scheduler
+  （彼此无强制先后）→ kubelet（逐节点 drain）；Swap 增加 `swapon --show` 验证标准；
+  containerd 2.4 明确为「计划验证（未发布）」；Alpine 表述改为 glibc 或兼容层要求。
+- **安全性**：端口表升为「端口 + 方向 + 作用域」；禁止项措辞改为「禁止作为安装前置条件」；
+  `.gitignore` 声明为误提交缓解措施而非 secret 隔离。
+- **扫描器**：占位符感知（忽略 `<...>`/`${VAR}`/`{{...}}`/`!vault`/`lookup()`/布尔值）；
+  增加 kubeconfig `token:` 检测；移除 `ansible_host` RFC1918 误报模式；允许清单自保护
+  （拒绝 `.*` 宽泛正则、校验路径存在）；新增 `test_scan_sensitive.py` 正例/反例回归测试，
+  CI 增加 unittest 步骤。
+- **历史治理**：三篇教程增加英文 `DO NOT USE FOR CURRENT DEPLOYMENT` 横幅并链接
+  `docs/compatibility.md`，降低搜索引擎/全文搜索误用风险。
+
+审查修正后验证命令（本地全部通过）：`check_markdown_links.py`、`check_markdown_style.py`、
+`scan_sensitive.py`、`python -m unittest discover -s .github/scripts -p "test_*.py"`。

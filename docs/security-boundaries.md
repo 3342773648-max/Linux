@@ -11,8 +11,8 @@
 
 | 禁止项 | 说明 |
 | --- | --- |
-| 无条件关闭防火墙 | `systemctl stop firewalld` / `ufw disable` + 不做端口收敛。只允许按官方文档**放行最小端口** |
-| 无条件关闭 SELinux / AppArmor | `setenforce 0` 且不保留策略。应配置为 enforcing + 放行必要策略 |
+| 禁止将关闭 host firewall 作为安装前置条件 | 应保留防火墙并按拓扑/CNI **放行必要流量**，禁止通过关闭防火墙解决 Kubernetes 网络问题 |
+| 禁止将关闭 SELinux / AppArmor 作为安装前置条件 | 应按发行版策略配置：enforcing + 放行必要策略，或遵循官方指南的最小例外路径 |
 | 关闭软件仓库签名验证 | `gpgcheck=0`、`repo_gpgcheck=0` 或删除 gpgkey 校验（此为**危险示例**，仅用于说明，见允许清单） |
 | 固定 kubeadm Token / 证书哈希 | 示例中 `--token <BOOTSTRAP_TOKEN>` 与 `--discovery-token-ca-cert-hash sha256:<CA_CERT_HASH>` 均为占位符，真实值必须由当前集群现场生成 |
 | 固定 Keepalived / HAProxy 口令 | `auth_pass <KEEPALIVED_AUTH_PASS>`、`stats auth admin:<HAPROXY_STATS_PASSWORD>` 必须占位；B1 起 HA 不在配置文件中写口令 |
@@ -33,12 +33,23 @@
 
 ## 3. 端口与 SSH 最小权限
 
-| 范围 | 要求 |
-| --- | --- |
-| 防火墙 | 只放行官方端口：6443（apiserver）、2379-2380（etcd，仅控制平面间）、10250（kubelet）、10257/10259（controller-manager/scheduler）、30000-32767（NodePort）；SSH 22 仅对管理来源放行 |
-| SSH 认证 | 优先密钥认证；禁止 root 直接密码登录；SSH 端口与来源 CIDR 收敛 |
-| host key 校验 | 首次连接通过 `ssh-keyscan` + 指纹比对登记，禁止 `StrictHostKeyChecking=no` 或 `AutoAddPolicy` 式的自动接受 |
-| 管理账号 | 专用运维账号 + `sudo` 最小提权；root 免密 sudo 不用于常规操作 |
+kubeadm 基线端口 + 方向/作用域（**不代表**所有 CNI、外部 LB、监控组件的完整端口集合）：
+
+| 端口 | 方向 / 作用域 | 说明 |
+| --- | --- | --- |
+| 6443 | Worker/外部 → 控制平面 | kube-apiserver（kubeadm get this port） |
+| 2379-2380 | 控制平面 ↔ 控制平面 | etcd server / peer，仅控制平面间放行 |
+| 10250 | 控制平面 ↔ 节点 | kubelet API（定期健康检查） |
+| 10257 / 10259 | 控制平面本机 / 受限监控 | kube-controller-manager / kube-scheduler secure endpoint |
+| 30000-32767 | 外部 → 节点 | NodePort 服务 |
+| 22 | 运维来源 → 节点 | SSH，仅对管理来源收敛 |
+
+SSH 与访问控制：
+
+- 优先密钥认证；禁止 root 直接密码登录；SSH 端口与来源 CIDR 收敛。
+- host key 校验：首次连接通过 `ssh-keyscan` + 指纹比对登记，禁止 `StrictHostKeyChecking=no` 或
+  `AutoAddPolicy` 式的自动接受。
+- 专用运维账号 + `sudo` 最小提权；root 免密 sudo 不用于常规操作。
 
 ## 4. 镜像、软件包与外部脚本校验
 
@@ -98,18 +109,26 @@ node_modules/
 
 规则由 B0 落地为根目录 `.gitignore`，后续新增敏感文件类型时同步更新本文档与 `.gitignore`。
 
+> **重要**：`.gitignore` 是**误提交缓解措施，不是 secret 隔离**（`git add -f` 仍可提交明文文件）。
+> 真正的安全门禁由 `.github/scripts/scan_sensitive.py` 与其 CI 执行承担。
+
 ## 7. 扫描与允许清单机制
 
 - 仓库 CI 执行 `.github/scripts/scan_sensitive.py`，扫描范围：全部被 Git 跟踪的 `.md` /
   `.yml` / `.yaml` / `.ini` / `.cfg` / `.txt` / `.env*`（`.github/scripts/` 与允许清单自身除外，
   它们属于 PR 审查对象）。
 - 扫描项：kubeadm Token 形状、`gpgcheck=0`/`repo_gpgcheck=0` 变体、明文 `ansible_password` /
-  `ansible_ssh_pass`、私钥块（RSA/EC/DSA/OpenSSH/加密私钥）、kubeconfig 证书数据
-  （`certificate-authority-data` / `client-certificate-data` / `client-key-data` + 长 base64）、
-  haproxy `stats auth` 明文口令、SSH/scp 到 RFC 1918 私有地址、cloud-init 明文密码。
+  `ansible_ssh_pass`（忽略 `<PASSWORD>` / `${VAR}` / `{{ vault_password }}` / `!vault` /
+  `lookup(...)` 等安全占位符）、私钥块（RSA/EC/DSA/OpenSSH/**PKCS#8**/加密私钥）、kubeconfig
+  内嵌凭据数据（`token:` / `certificate-*-data:` + 长 base64 形状）、haproxy `stats auth`
+  明文口令、SSH/scp/rsync 命令行到 RFC 1918 私有地址、明文 password 赋值字段
+  （key 形状为 password/passwd 后跟冒号或等号；忽略布尔值与安全占位符）。
+- **规则边界（诚实声明）**：Token 形状与 SSH/RFC1918 规则是**泄露启发式检测**，不是凭据
+  有效性检测；真实凭据经变量拼接、base64、跨行拆分等变形后可能不被识别，属 B1+ 增强范围。
 - **允许清单** `.github/scan-allowlist.txt`：每条 `文件路径::精确匹配整行内容的正则::原因`，
-  只允许精确命中（锚定整行），禁止按目录宽泛排除。允许清单的变更在 PR 中可见并可审查；
-  安全文档讨论禁止项时优先用占位符，仅在确需展示字面危险示例时使用允许清单。
+  只允许精确命中（锚定整行），禁止按目录宽泛排除；允许清单自身受 CI 校验（字段数、路径存在、
+  原因非空、拒绝 `.*` / `^.*$` 等明显全匹配正则），防止其成为绕过入口。允许清单的变更在 PR 中
+  可见并可审查；安全文档讨论禁止项时优先用占位符，仅在确需展示字面危险示例时使用允许清单。
 - 本文件第 1 节「关闭仓库签名校验」的字面示例即通过该机制豁免（带明确原因）。
 
 ## 8. 边界声明

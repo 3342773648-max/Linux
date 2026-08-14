@@ -32,15 +32,16 @@
 
 B0「兼容矩阵与安全基线」于 **2026-08-14** 完成：
 
-- 已确立第一条正式支持的集群交付组合：Ubuntu 24.04 LTS + Kubernetes 1.36 + containerd 2.3 LTS + Calico + Ansible Core 2.21，详见 [`docs/compatibility.md`](./docs/compatibility.md)；
+- 已确立**官方兼容确认（未实机验证）**的集群交付组合：Ubuntu 24.04 LTS + Kubernetes 1.36 + containerd 2.3 LTS + Calico + Ansible Core 2.21，详见 [`docs/compatibility.md`](./docs/compatibility.md)；
 - 三篇历史教程均标注为**历史材料**，与当前重建路线解耦；
 - 新增实验环境合同（[`docs/lab-environment.md`](./docs/lab-environment.md)）与安全基线（[`docs/security-boundaries.md`](./docs/security-boundaries.md)）；
 - 新增 `.gitignore` 覆盖 Kubernetes、Ansible 与实验日志敏感产物；
-- CI 扩展为 Markdown 链接检查 + 格式检查 + 敏感字段/危险示例扫描；
+- CI 扩展为 Markdown 链接检查 + 格式检查 + 敏感字段/危险示例扫描 + 扫描器回归测试（正例/反例）；
 - 仓库扫描不到可复用 Token、明文密码、私钥或真实节点地址，危险示例仅以明确允许清单豁免、可审查。
 
-> B0 是文档与门禁阶段，**不宣称已完成真实多节点安装验收**；多节点验收与
-> 完整 Ansible 自动化属于 [B1-B4](#重建路线) 后续里程碑。
+> B0 是文档与门禁阶段，**不宣称已完成真实多节点安装验收**；「已确认」仅指官方版本组合
+> 与文档一致性确认，真实验收属 B1；多节点验收与完整 Ansible 自动化属于
+> [B1-B4](#重建路线) 后续里程碑。
 
 ## 文档入口
 

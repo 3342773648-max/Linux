@@ -19,3 +19,5 @@ jobs:
         run: python .github/scripts/check_markdown_style.py
       - name: Scan sensitive fields and dangerous examples
         run: python .github/scripts/scan_sensitive.py
+      - name: Scanner regression tests
+        run: python -m unittest discover -s .github/scripts -p "test_*.py" -v

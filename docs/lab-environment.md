@@ -14,6 +14,9 @@
 | 198.51.100.0/24 | 三控制平面 HA 实验 |
 | 203.0.113.0/24 | 保留，不用于拓扑示例 |
 
+- RFC 5737 地址仅用于文档与隔离实验拓扑，**不得作为实际生产节点地址**；实验网络不得
+  向公网或生产网络宣告/路由这些前缀。
+
 - 主机名使用 `cp1`、`cp2`、`cp3`、`node1`…`nodeN` 这类中性名称，不绑定真实域名。
 - 所有 Token、证书哈希、密码、密钥必须以 `<UPPER_SNAKE_CASE>` 占位符出现，例如
   `<BOOTSTRAP_TOKEN>`、`sha256:<CA_CERT_HASH>`、`<KEEPALIVED_AUTH_PASS>`、
@@ -38,7 +41,8 @@
    containerd 2.3 LTS + Calico
 ```
 
-- 最少 **2 个节点**（1 控制平面 + 1 Worker）即可完成安装链路验收；预算允许时再加 1 个 Worker。
+- **B1 最小验收拓扑**：1 控制平面 + 1 Worker（这是本项目的验收拓扑，不是 Kubernetes 产品
+  最少节点限制）；预算允许时再加 1 个 Worker。
 - 控制平面 ≥ 2 vCPU / ≥ 4GB RAM；Worker ≥ 2 vCPU / ≥ 2GB RAM；磁盘 ≥ 30GB。
 - 不允许在控制平面上运行 Worker 负载（taint 保持默认）。
 

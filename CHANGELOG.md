@@ -27,11 +27,26 @@
 ### Changed
 
 - **历史教程治理**：三篇教程（单节点 1.18 / HA 1.16 / Ansible 二进制 1.16）首屏警示强化，
+  新增英文 `DO NOT USE FOR CURRENT DEPLOYMENT` 横幅并链接到 `docs/compatibility.md`；
   新增「历史版本清单」表（CentOS 7、Docker 18.x、K8s 1.16/1.18、阿里云源、Flannel 等标记为
   历史参考），修复章节编号、行尾空白与格式问题；教程不再作为当前执行手册。
-- **README**：`当前状态` 更新为 B0 完成；`文档入口` 增加三份 B0 文档并明确教程为历史；
-  B0 路线标记为已完成；`完成标准` 保持“未满足”语义（多节点验收仍属 B1+）。
-- **CI**：在原有 Markdown 链接检查基础上增加 Markdown 格式检查与敏感字段扫描。
+- **README**：`当前状态` 更新为 B0 完成并注明「官方兼容确认（未实机验证）」；`文档入口`
+  增加三份 B0 文档并明确教程为历史；B0 路线标记为已完成；`完成标准` 保持“未满足”语义。
+- **CI**：在原有 Markdown 链接检查基础上增加 Markdown 格式检查、敏感字段扫描与
+  扫描器正例/反例回归测试。
+- **兼容矩阵语义修正**（2026-08-14，ChatGPT 审查后）：「已确认」改为「已确认（官方兼容，
+  未实机验证）」，增加「官方兼容 → 项目选定 → 实机验证」三层说明；补 kube-proxy 版本偏差；
+  升级顺序改为「apiserver → controller-manager/scheduler（彼此无强制先后）→ kubelet
+  （逐节点 drain）」；Swap 增加验证标准；containerd 2.4 明确为「计划验证（未发布）」；
+  Alpine 表述改为「默认不纳入支持范围；kubeadm 要求 glibc 或兼容层」。
+- **安全基线**：端口表升级为「端口 + 方向 + 作用域」；禁止项措辞改为「禁止将关闭
+  firewall / SELinux / AppArmor 作为安装前置条件」；`.gitignore` 增加「误提交缓解措施，
+  不是 secret 隔离」声明；扫描项说明对齐扫描器改进（占位符感知、PKCS#8、kubeconfig token）。
+- **扫描器重构**（`scan_sensitive.py`）：支持值级占位符感知（忽略 `<PASSWORD>`、`${VAR}`、
+  `{{ vault_password }}`、`!vault`、`lookup(...)`、布尔字面量）；增加 `token:` /
+  `client-key-data` 等 kubeconfig 凭据形状检测；移除 `ansible_host` RFC1918 模式（IP 本身
+  不是凭据）；允许清单自保护校验（拒绝 `.*` 等宽泛正则、校验路径存在性与原因非空）；
+  新增 `test_scan_sensitive.py` 正例/反例回归测试。
 
 ### Security
 
