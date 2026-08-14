@@ -1,0 +1,40 @@
+# ==========================================================================
+#  B1 首条支持路径变量（来源：docs/compatibility.md，查询日 2026-08-14）
+#  所有版本均为锚点，B1 不做动态解析；后续 patch 须回归验证后更新本文件。
+# ==========================================================================
+
+# === 版本 Pin ===
+kubernetes_version: "1.36.2"          # B1 锚点
+kubeadm_version: "1.36.2"
+kubelet_version: "1.36.2"
+kubectl_version: "1.36.2"
+containerd_version: "2.3"             # B1 锚点：2.3.x deb
+calico_version: "3.32.1"
+image_repository: "registry.k8s.io"
+
+# === 网络 ===
+pod_network_cidr: "10.244.0.0/16"    # Calico 建议的 Pod 网段（避免与 RFC1918 实验网段冲突）
+service_network_cidr: "10.96.0.0/16" # kubeadm 默认 Service 网段
+dns_domain: "cluster.local"
+
+# 单控制平面模式：直接指向 CP 节点地址（B3 HA 时改为 LB/VIP）
+control_plane_endpoint: "192.0.2.10:6443"
+
+# === SSH / Ansible ===
+ansible_user: ansible                 # B0：专用运维账号，禁 root 直接登录
+ansible_port: 22
+# ansible_ssh_private_key_file: ~/.ssh/id_ed25519  # 用户自行配置，不入库
+
+# === 凭据生命周期（B0 安全基线）===
+join_token_ttl: "24h"                 # kubeadm token create --ttl（显式传入，不依赖默认值）
+# certificate-key 由 kubeadm 固定为 2h（upload-certs Secret 生命周期），
+# 本项目不提供控制参数；此处仅作文档性说明，见 kubeadm 官方 HA 文档。
+# certificate_key_ttl: "2h"
+
+# === containerd ===
+containerd_systemd_cgroup: true       # 2.x 路径：[plugins.'io.containerd.cri.v1.runtime'...]
+
+# === 仓库源 ===
+containerd_apt_repo: "https://download.docker.com/linux/ubuntu"
+containerd_apt_suite: "stable"
+kubeadm_apt_repo: "https://pkgs.k8s.io/core:/stable:/v1.36/deb/"

@@ -105,6 +105,12 @@ class AllowlistScenarioTest(unittest.TestCase):
         line = "ansible_password: {{ vault_password }}"
         self.assertEqual(ss.scan_text("x.yml", line + "\n", []), [])
 
+    def test_j2_template_with_secret_is_flagged(self):
+        """.j2 模板（如 roles/*/templates/*.j2）必须纳入扫描，防止真实凭据经模板入库。"""
+        template = "kubeadm join 192.0.2.10:6443 --token abcdef.0123456789abcdef --discovery-token-ca-cert-hash sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef --control-plane --certificate-key f8902e114ef118304e561c3ecd4d0b543adc226b7a07f675f56564185ffe0c07"
+        hits = ss.scan_text("roles/control_plane/templates/join-command.yaml.j2", template + "\n", [])
+        self.assertGreaterEqual(len(hits), 1, "真实 token 在 .j2 模板中必须被扫描到")
+
 
 class RealAllowlistProbeTest(unittest.TestCase):
     """加载真实允许清单：条目数>=3、路径全部存在、正则可编译（自保护）。"""

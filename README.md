@@ -43,6 +43,17 @@ B0「兼容矩阵与安全基线」于 **2026-08-14** 完成：
 > 与文档一致性确认，真实验收属 B1；多节点验收与完整 Ansible 自动化属于
 > [B1-B4](#重建路线) 后续里程碑。
 
+B1「真实 Ansible 交付结构」**实施已就绪**（2026-08-14）：
+
+- `inventory/`（示例分组 + group_vars + RFC 5737 host_vars）；
+- `roles/`（preflight/containerd/kubeadm/control_plane/worker/cni/load_balancer 占位）；
+- `playbooks/`（site / reset / upgrade）；`scripts/verify-cluster.sh`；
+- CI 已加 `ansible-playbook --syntax-check` 与 `ansible-inventory` 门禁。
+
+> B1 交付的是**真实的自动化骨架与执行逻辑**，通过 Ansible 语法校验；
+> **尚未在真实 Ubuntu 24.04 + K8s 1.36.2 环境运行验收**。真实多节点部署与幂等性属
+> B2，HA/升级执行属 B3。
+
 ## 文档入口
 
 | 文档 | 当前用途 |
@@ -53,6 +64,20 @@ B0「兼容矩阵与安全基线」于 **2026-08-14** 完成：
 | [kubeadm 单节点部署](./使用kubeadm快速部署一个K8s集群.md) | 历史教程：学习与测试环境的手动部署复盘 |
 | [kubeadm 高可用部署](./使用kubeadm搭建高可用的K8s集群.md) | 历史教程：HA 拓扑和组件配置复盘 |
 | [Ansible 自动化部署](./Ansible自动化部署K8S集群.md) | 历史教程：Ansible 概念、Inventory 和 Playbook 学习参考 |
+
+### B1（当前执行结构，未真实验收）
+
+| 项目 | 状态 |
+| --- | --- |
+| `inventory/`（分组 + group_vars + host_vars，RFC 5737 示例） | ✅ 已建 |
+| `roles/`（preflight/containerd/kubeadm/control_plane/worker/cni/load_balancer） | ✅ 已建 |
+| `playbooks/`（site / reset / upgrade） | ✅ 已建（syntax 校验通过） |
+| `scripts/verify-cluster.sh` | ✅ 已建（验收辅助，B2 扩展） |
+| CI 语法门禁（ansible-playbook syntax-check + inventory） | ✅ 已加 |
+| 真实单控制平面 + Worker 验收 | ⬜ 未完成（属 B2） |
+
+> B1 交付的是**真实的自动化骨架与执行逻辑**，通过 Ansible 语法校验；尚未在任何真实
+> Ubuntu 24.04 + Kubernetes 1.36.2 集群上运行验收。真实多节点部署、幂等复跑与 reset 属 B2，HA/升级属 B3。
 
 旧教程中的 Kubernetes、Docker、操作系统和镜像版本均属历史参考，**不得**按旧文档执行；
 执行前必须根据 [`docs/compatibility.md`](./docs/compatibility.md) 复核。
@@ -77,7 +102,7 @@ B0「兼容矩阵与安全基线」于 **2026-08-14** 完成：
 - ✅ 历史教程治理：三篇教程标注为历史材料，旧版本标记为「历史参考」
 - ✅ CI 扩展：链接检查 + 格式检查 + 敏感字段/危险示例扫描
 
-### B1：真实 Ansible 交付结构
+### ~~B1：真实 Ansible 交付结构~~（结构已就绪 2026-08-14，真实验收属 B2）
 
 ```text
 inventory/
@@ -97,6 +122,11 @@ playbooks/
 scripts/
   verify-cluster.sh
 ```
+
+- ✅ `inventory/`、`roles/`、`playbooks/`、`scripts/` 结构与配置已建；
+- ✅ `ansible-playbook --syntax-check`（site/reset/upgrade）与 `ansible-inventory` 门禁通过；
+- ⬜ **真实单控制平面 + Worker 安装验收（Node Ready、CoreDNS、Calico、Service/DNS、Pod 调度）见 B2**；
+- ⬜ 幂等复跑与 reset 可重复见 B2。
 
 先支持一条可信路径，再扩展系统版本和网络插件，不同时维护多套未验证脚本。
 

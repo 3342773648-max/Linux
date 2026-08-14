@@ -1,0 +1,5 @@
+127.0.0.1 localhost
+127.0.1.1 {{ ansible_fqdn | default(ansible_hostname) }} {{ ansible_hostname }}
+
+# 以下条目由 /etc/hosts 管理约定补充（本仓库不硬编码节点映射）：
+# 节点间解析依赖集群 DNS（CoreDNS）与 kube-apiserver 地址（control_plane_endpoint）。

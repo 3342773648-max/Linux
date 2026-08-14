@@ -1,0 +1,32 @@
+# worker role：kubeadm join（凭据来自 first CP 注册的 hostvars）
+# worker 不生成 token/cert-key（职责归控制平面编排）
+
+- name: 检查节点是否已加入（幂等）
+  ansible.builtin.stat:
+    path: /etc/kubernetes/kubelet.conf
+  register: kubelet_conf
+
+- name: 获取控制平面 join 命令（来自 first CP hostvars）
+  ansible.builtin.set_fact:
+    worker_join_command: "{{ hostvars[groups['control_plane'][0]]['k8s_worker_join_command'] }}"
+  when:
+    - not kubelet_conf.stat.exists
+    - hostvars[groups['control_plane'][0]]['k8s_worker_join_command'] is defined
+  no_log: true
+
+- name: 执行 kubeadm join（worker）
+  ansible.builtin.command: "{{ worker_join_command }}"
+  when:
+    - not kubelet_conf.stat.exists
+    - worker_join_command is defined
+  no_log: true
+
+- name: 启用并启动 kubelet
+  ansible.builtin.systemd:
+    name: kubelet
+    state: started
+    enabled: true
+
+- name: 确认已加入节点
+  ansible.builtin.debug:
+    msg: "worker {{ inventory_hostname }} 已 join（如 join 命令可用时）"

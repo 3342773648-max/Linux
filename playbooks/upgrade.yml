@@ -1,0 +1,23 @@
+# upgrade.yml：B1 提供骨架，实际升级执行归 B3
+# 约束（B0 兼容矩阵 + kubeadm 官方）：
+#   - 不跨 minor（1.36 → 1.37 需走独立 minor 升级流程）
+#   - 顺序：CP:first plan/apply → 其余 CP upgrade node → worker upgrade node
+#   升级目标是显式 pin，禁止 ansible 'latest' 或动态解析。
+
+- name: B3 - 升级骨架（占位，勿在 B1 执行）
+  hosts: control_plane[0]
+  gather_facts: false
+  tasks:
+    - name: 检查升级目标（示例：显式 pin，禁止 latest）
+      ansible.builtin.assert:
+        that:
+          - kubernetes_upgrade_target is defined
+          - kubernetes_upgrade_target is version(kubernetes_version, '>=')
+          - kubernetes_upgrade_target.split('.')[0] == kubernetes_version.split('.')[0]
+        fail_msg: "升级必须同 minor（B0 规则），且目标版需显式声明，禁止 latest。"
+
+    # B3 实现：
+    # - kubeadm upgrade plan
+    # - kubeadm upgrade apply v{{ kubernetes_upgrade_target }} （CP:first）
+    # - 其余 CP：kubeadm upgrade node
+    # - worker：kubeadm upgrade node（逐节点 drain）

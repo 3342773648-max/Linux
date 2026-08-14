@@ -1,0 +1,35 @@
+# site.yml：B1 首条支持路径装配（单控制平面）
+# 依赖链（ChatGPT 推理）：all(preflight/containerd/kubeadm) → first CP(control_plane) → cni → worker
+# 注意：worker 依赖 first CP 已注册的 join 凭据，故 control_plane 必须先于 worker。
+
+- name: B1 - 全部节点：前置检查 + 容器运行时 + Kubernetes 工具
+  hosts: all
+  gather_facts: true
+  order: sorted
+  roles:
+    - role: preflight
+    - role: containerd
+    - role: kubeadm
+
+- name: B1 - 第一个控制平面：kubeadm init + 注册 join 凭据
+  hosts: control_plane[0]
+  roles:
+    - role: control_plane
+
+- name: B1 - Worker 节点：kubeadm join
+  hosts: worker
+  roles:
+    - role: worker
+
+- name: B1 - 第一个控制平面：安装 Calico CNI
+  hosts: control_plane[0]
+  roles:
+    - role: cni
+
+- name: B1 - 汇总提示（真实验收属 B2）
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: 提示人工验收入口
+      ansible.builtin.debug:
+        msg: "B1 结构执行完成。请使用 scripts/verify-cluster.sh 在真实环境验收；真实多节点验收与幂等性属 B2。"

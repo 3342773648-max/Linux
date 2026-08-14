@@ -1,0 +1,58 @@
+# CNI role：Calico v3.32.1（tigera-operator 官方路径）
+# 顺序：CRD → tigera-operator → custom-resources → 等待 Tigerastatus
+# 只在 first control_plane 上执行（site.yml 限定 hosts: control_plane[0]）
+
+- name: 下载并应用 Calico v3.32.1 CRD（server-side apply，避免大清单 request 超限）
+  ansible.builtin.command: >-
+    kubectl apply --server-side -f
+    https://raw.githubusercontent.com/projectcalico/calico/v3.32.1/manifests/v1_crd_projectcalico_org.yaml
+  environment:
+    KUBECONFIG: /etc/kubernetes/admin.conf
+  changed_when: true
+  register: cni_crd
+
+- name: 下载并应用 Tigera Operator
+  ansible.builtin.command: >-
+    kubectl apply -f
+    https://raw.githubusercontent.com/projectcalico/calico/v3.32.1/manifests/tigera-operator.yaml
+  environment:
+    KUBECONFIG: /etc/kubernetes/admin.conf
+  changed_when: true
+  register: cni_operator
+
+- name: 写入 Calico custom-resources（含 CALICO_IPV4POOL_CIDR 覆盖）
+  ansible.builtin.template:
+    src: custom-resources.yaml.j2
+    dest: /etc/kubernetes/calico-custom-resources.yaml
+    owner: root
+    group: root
+    mode: "0600"
+
+- name: 应用 Calico custom-resources
+  ansible.builtin.command: >-
+    kubectl apply -f /etc/kubernetes/calico-custom-resources.yaml
+  environment:
+    KUBECONFIG: /etc/kubernetes/admin.conf
+  changed_when: true
+
+- name: 等待 Calico 组件就绪（tigerastatus 全 True）
+  ansible.builtin.shell: |
+    set -e
+    timeout 600 bash -c '
+      while true; do
+        if kubectl get tigerastatus --no-headers 2>/dev/null \
+             | awk "\$4 == \"True\" && \$4 != \"\"" | grep -q .; then
+          break
+        fi
+        sleep 10
+      done
+      kubectl get tigerastatus
+    '
+  environment:
+    KUBECONFIG: /etc/kubernetes/admin.conf
+  changed_when: false
+  when: cni_crd is defined
+
+- name: 记录 CNI 安装结果
+  ansible.builtin.debug:
+    msg: "Calico v{{ calico_version }}（tigera-operator）已部署并等待 Tigerastatus 全 True。"

@@ -1,0 +1,71 @@
+# kubeadm role：安装 kubeadm/kubelet/kubectl（pkgs.k8s.io 官方源）+ 版本 hold
+# 来源：B0 兼容矩阵（install-kubeadm，查询日 2026-08-14）
+
+- name: 添加 Kubernetes 官方 GPG 密钥（pkgs.k8s.io）
+  ansible.builtin.shell: |
+    set -e
+    install -m 0755 -d /etc/apt/keyrings
+    curl -fsSL 'https://pkgs.k8s.io/core:/stable:/v1.36/deb/Release.key' -o /etc/apt/keyrings/kubernetes-apt-keyring.asc
+    chmod a+r /etc/apt/keyrings/kubernetes-apt-keyring.asc
+  args:
+    creates: /etc/apt/keyrings/kubernetes-apt-keyring.asc
+  changed_when: true
+
+- name: 添加 Kubernetes 官方 apt 源（v1.36 stable，deb822 格式）
+  ansible.builtin.deb822_repository:
+    name: kubernetes-v136
+    types: [deb]
+    uris: https://pkgs.k8s.io/core:/stable:/v1.36/deb/
+    suites: ["/"]
+    components: []
+    signed_by: /etc/apt/keyrings/kubernetes-apt-keyring.asc
+    state: present
+
+- name: 安装 kubelet / kubeadm / kubectl（锚点 {{ kubernetes_version }}）
+  ansible.builtin.apt:
+    name:
+      - "kubelet={{ kubelet_version }}*"
+      - "kubeadm={{ kubeadm_version }}*"
+      - "kubectl={{ kubectl_version }}*"
+    state: present
+    update_cache: true
+
+- name: 锁定 Kubernetes 软件包（防非预期升级）
+  ansible.builtin.dpkg_selections:
+    selection: hold
+    name: "{{ item }}"
+  loop:
+    - kubelet
+    - kubeadm
+    - kubectl
+
+- name: 验证 kubeadm 版本
+  ansible.builtin.command: kubeadm version -o short
+  register: kubeadm_version_check
+  changed_when: false
+
+- name: 验证 kubectl 版本
+  ansible.builtin.command: kubectl version --client -o jsonpath='{.clientVersion.gitVersion}'
+  register: kubectl_version_check
+  changed_when: false
+
+- name: 断言 kubeadm 版本与锚点一致
+  ansible.builtin.assert:
+    that:
+      - kubeadm_version_check.stdout == kubernetes_version
+    fail_msg: "kubeadm 版本 {{ kubeadm_version_check.stdout }} 与锚点 {{ kubernetes_version }} 不一致"
+
+- name: 断言 kubectl 版本与锚点一致
+  ansible.builtin.assert:
+    that:
+      - kubectl_version_check.stdout == "v" ~ kubectl_version
+    fail_msg: "kubectl 版本 {{ kubectl_version_check.stdout }} 与锚点 v{{ kubectl_version }} 不一致"
+
+- name: 启用 kubelet（服务由后续 init/join 启动）
+  ansible.builtin.systemd:
+    name: kubelet
+    enabled: true
+
+- name: 记录 Kubernetes 工具版本
+  ansible.builtin.debug:
+    msg: "kubeadm={{ kubeadm_version_check.stdout }} kubectl 已安装（见上方校验）"

@@ -1,0 +1,29 @@
+# worker/reset.yml：节点清理（reset.yml 指向此文件）
+
+- name: kubeadm reset（worker）
+  ansible.builtin.command: kubeadm reset --force
+  ignore_errors: true
+
+- name: 清理 Kubernetes 组件与网络配置
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - /etc/cni/net.d
+    - /etc/kubernetes
+    - /var/lib/kubelet
+
+- name: 刷新 iptables（仅 filter/nat 表，专用实验节点适用）
+  ansible.builtin.command: "{{ item }}"
+  loop:
+    - iptables -F
+    - iptables -t nat -F
+  ignore_errors: true
+  changed_when: true
+
+- name: 禁用 kubelet
+  ansible.builtin.systemd:
+    name: kubelet
+    state: stopped
+    enabled: false
+  ignore_errors: true

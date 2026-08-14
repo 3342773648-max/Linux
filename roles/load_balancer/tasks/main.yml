@@ -1,0 +1,6 @@
+# load_balancer role：B1 占位（B3 实现 HA Load Balancer）
+# B1 单控制平面不使用负载均衡器；本 role 仅创建结构，避免 scope 漂移到 B3。
+---
+- name: B1 占位——HA 负载均衡器属 B3 范围
+  ansible.builtin.debug:
+    msg: "load_balancer role 为 B1 占位；B3 实现 kube-vip 或 Keepalived/HAProxy（且禁止把口令写入 Git）。"

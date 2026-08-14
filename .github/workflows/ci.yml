@@ -21,3 +21,21 @@ jobs:
         run: python .github/scripts/scan_sensitive.py
       - name: Scanner regression tests
         run: python -m unittest discover -s .github/scripts -p "test_*.py" -v
+  ansible:
+    runs-on: ubuntu-latest
+    needs: docs
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install ansible-core (B1 support path)
+        run: pip install 'ansible-core>=2.21,<2.22'
+      - name: Ansible syntax check (site)
+        run: ansible-playbook -i inventory/hosts.yml playbooks/site.yml --syntax-check
+      - name: Ansible syntax check (reset)
+        run: ansible-playbook -i inventory/hosts.yml playbooks/reset.yml --syntax-check
+      - name: Ansible syntax check (upgrade)
+        run: ansible-playbook -i inventory/hosts.yml playbooks/upgrade.yml --syntax-check
+      - name: Inventory parse
+        run: ansible-inventory -i inventory/hosts.yml --graph

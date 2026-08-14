@@ -92,11 +92,16 @@ inventory/**/vault.yml
 vault_pass*
 *.vault
 .ansible-vault
+*.retry
+inventory/host_vars/*.local.yml
+inventory/group_vars/**/*.local.yml
+inventory/hosts.ini
 
 # 实验产物与日志
 artifacts/
 logs/
 *.log
+*.kubeadm.log
 
 # 开发与 IDE
 __pycache__/

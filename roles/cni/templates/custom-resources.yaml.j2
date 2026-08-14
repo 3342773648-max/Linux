@@ -1,0 +1,20 @@
+# Calico custom-resources 模板（Calico v3.x）
+# CALICO_IPV4POOL_CIDR 与 inventory 的 pod_network_cidr 对齐（B0 兼容矩阵要求）
+apiVersion: operator.tigera.io/v1
+kind: Installation
+metadata:
+  name: default
+spec:
+  calicoNetwork:
+    ipPools:
+      - name: default-ipv4-ippool
+        blockSize: 26
+        cidr: "{{ pod_network_cidr }}"
+        encapsulation: VXLAN
+        natOutgoing: Enabled
+---
+apiVersion: operator.tigera.io/v1
+kind: APIServer
+metadata:
+  name: default
+spec: {}

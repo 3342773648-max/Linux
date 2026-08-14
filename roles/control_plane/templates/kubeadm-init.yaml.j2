@@ -1,0 +1,38 @@
+# kubeadm-init 配置模板（v1beta4）
+# 来源：Kubernetes 官方 kubeadm-config.v1beta4（查询日 2026-08-14）
+# extraArgs 为 [{name, value}] 列表格式（v1beta4 变更），勿回退到旧 map 格式。
+
+apiVersion: kubeadm.k8s.io/v1beta4
+kind: InitConfiguration
+localAPIEndpoint:
+  advertiseAddress: "{{ node_ip }}"
+  bindPort: 6443
+nodeRegistration:
+  criSocket: "unix:///var/run/containerd/containerd.sock"
+  name: "{{ inventory_hostname }}"
+---
+apiVersion: kubeadm.k8s.io/v1beta4
+kind: ClusterConfiguration
+clusterName: "kubernetes"
+kubernetesVersion: "v{{ kubernetes_version }}"
+imageRepository: "{{ image_repository }}"
+controlPlaneEndpoint: "{{ control_plane_endpoint }}"
+networking:
+  podSubnet: "{{ pod_network_cidr }}"
+  serviceSubnet: "{{ service_network_cidr }}"
+  dnsDomain: "{{ dns_domain }}"
+# extraArgs（v1beta4 结构化列表）：
+# apiServer:
+#   extraArgs:
+#     - name: example
+#       value: "true"
+---
+apiVersion: kubelet.config.k8s.io/v1beta1
+kind: KubeletConfiguration
+# B0 兼容矩阵：首条支持路径仅使用 systemd cgroup（cgroup v2）
+cgroupDriver: "systemd"
+---
+# KubeProxyConfiguration（注意：独立 apiVersion，非 kubeadm v1beta4）
+apiVersion: kubeproxy.config.k8s.io/v1alpha1
+kind: KubeProxyConfiguration
+mode: "iptables"

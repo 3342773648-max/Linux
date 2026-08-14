@@ -1,0 +1,39 @@
+# reset.yml：B1 逆向卸载（先 workers 后 CP，再清理运行时）
+# 语义：清除 kubeadm/Kubernetes 节点状态，使节点可重新加入；不删除 OS/SSH/apt 配置。
+
+- name: B1 - 清理 Worker 节点
+  hosts: worker
+  gather_facts: false
+  tasks:
+    - name: worker 节点 reset
+      ansible.builtin.import_role:
+        name: worker
+        tasks_from: reset.yml
+
+- name: B1 - 清理控制平面节点
+  hosts: control_plane
+  gather_facts: false
+  tasks:
+    - name: 控制平面 reset
+      ansible.builtin.import_role:
+        name: control_plane
+        tasks_from: reset.yml
+
+- name: B1 - 清理容器运行时（containerd 保留、仅停用数据目录）
+  hosts: all
+  gather_facts: false
+  tasks:
+    - name: 停止并禁用 containerd
+      ansible.builtin.systemd:
+        name: containerd
+        state: stopped
+        enabled: false
+      ignore_errors: true
+
+- name: B1 - 提示
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: reset 完成提示
+      ansible.builtin.debug:
+        msg: "reset 完成。节点已脱离集群状态；快照还原仍是环境复原的首选（B0 lab-environment.md）。"

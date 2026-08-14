@@ -48,11 +48,29 @@
   不是凭据）；允许清单自保护校验（拒绝 `.*` 等宽泛正则、校验路径存在性与原因非空）；
   新增 `test_scan_sensitive.py` 正例/反例回归测试。
 
+### Added
+
+- **B1 真实 Ansible 交付结构**（2026-08-14，结构就绪，未真实验收）：
+  - `inventory/`：逻辑分组（k8s_cluster/control_plane/worker，预留 etcd）+ `group_vars/all.yml`
+    （版本锚点、网络 CIDR、SSH、token/Cert TTL）+ RFC 5737 host_vars；
+  - `roles/`：`preflight`、`containerd`、`kubeadm`、`control_plane`、`worker`、`cni`、`load_balancer`（B3 占位）；
+  - `playbooks/`：`site.yml`、`reset.yml`、`upgrade.yml`（升级为 B3 骨架，显式 pin、不跨 minor）；
+  - `scripts/verify-cluster.sh`：验收辅助脚本（nodes/pods/Calico/DNS，退出码语义）；
+  - `ansible.cfg`：roles_path/inventory/host_key_checking 配置；
+  - CI 新增 `ansible` 任务（ansible-core 2.21 + syntax-check + inventory graph）。
+
+### Changed
+
+- **README**：`当前状态` 增加 B1 结构就绪声明；`重建路线` B1 标记「结构已就绪，真实验收属 B2」。
+- **CHANGELOG / change record**：新增 B1 变更记录。
+
 ### Security
 
 - 明确 join 凭据（Token / certificate-key / CA 哈希）现场生成、短时有效、安全通道传输；
-  仓库内不存在可复用凭据与真实节点地址。
-- 明确软件仓库与容器镜像的签名/校验要求，禁止关闭软件仓库签名验证与未固定版本的外部脚本。
+  仓库内不存在可复用凭据与真实节点地址（B0 基线延续至 B1 自动化骨架）。
+- 明确软件仓库与容器镜像的签名/校验要求，禁止关闭软件仓库签名验证与未固定版本的外部脚本（B0）。
+- **B1**：join token / certificate-key 现场生成、短时有效、`no_log`，不写入 inventory / Git / CI artifact；
+  明文密码不入 inventory（SSH 密钥认证，B0 安全基线延续）。
 
 ## [旧版本]
 

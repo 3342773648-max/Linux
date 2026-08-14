@@ -1,0 +1,132 @@
+# preflight：操作系统前置条件（swap/sysctl/内核模块/时间同步/基础软件）
+# 原则：所有持久化语义落地（fstab、modules-load.d、sysctl.d），重启后仍成立。
+
+- name: 检查操作系统为 Ubuntu 24.04（首条支持路径）
+  ansible.builtin.assert:
+    that:
+      - ansible_distribution == "Ubuntu"
+      - ansible_distribution_major_version == "24"
+    fail_msg: "首条支持路径仅支持 Ubuntu 24.04 LTS，当前为 {{ ansible_distribution }} {{ ansible_distribution_version }}"
+
+- name: 检查架构为 x86_64
+  ansible.builtin.assert:
+    that:
+      - ansible_architecture == "x86_64"
+    fail_msg: "首条支持路径仅支持 x86_64（B0 兼容矩阵）"
+
+- name: 检查内核版本 ≥ 5.4（cgroup v2 / Ubuntu 24.04 默认满足）
+  ansible.builtin.assert:
+    that:
+      - ansible_kernel is version('5.4', '>=')
+    fail_msg: "内核过旧（{{ ansible_kernel }}），需 ≥ 5.4"
+
+# ---- Swap（B0 兼容矩阵：节点必须关闭 Swap，重启后不得恢复）----
+- name: 收集 swap 状态
+  ansible.builtin.command: swapon --show --noheadings
+  register: swap_status
+  changed_when: false
+  failed_when: false
+
+- name: 关闭当前 swap（临时）
+  ansible.builtin.command: swapoff -a
+  when: swap_status.stdout != ""
+  changed_when: true
+
+- name: 读取 /etc/fstab
+  ansible.builtin.command: cat /etc/fstab
+  register: fstab_content
+  changed_when: false
+
+- name: 持久化禁用 swap（注释 /etc/fstab 中 swap 行，重启后仍生效）
+  ansible.builtin.replace:
+    path: /etc/fstab
+    regexp: '^([^#].*\sswap\s.*)$'
+    replace: '# \1'
+  when: "'swap' in fstab_content.stdout"
+
+# ---- 内核模块（overlay / br_netfilter）----
+- name: 加载内核模块
+  ansible.builtin.command: "modprobe {{ item }}"
+  loop:
+    - overlay
+    - br_netfilter
+  register: modprobe_result
+  failed_when: modprobe_result.rc != 0
+  changed_when: false
+
+- name: 持久化内核模块（/etc/modules-load.d/k8s.conf）
+  ansible.builtin.copy:
+    dest: /etc/modules-load.d/k8s.conf
+    content: |
+      overlay
+      br_netfilter
+    mode: "0644"
+
+# ---- sysctl（/etc/sysctl.d/k8s.conf，持久化）----
+- name: 写入 sysctl
+  ansible.builtin.copy:
+    dest: /etc/sysctl.d/k8s.conf
+    content: |
+      # Kubernetes 必需（kubeadm preflight）
+      net.bridge.bridge-nf-call-iptables  = 1
+      net.bridge.bridge-nf-call-ip6tables = 1
+      net.ipv4.ip_forward                 = 1
+    mode: "0644"
+
+- name: 应用 sysctl
+  ansible.builtin.command: sysctl --system
+  changed_when: false
+
+# ---- 数据盘文件系统提示（btrfs/zfs 需显式确认）----
+- name: 检查数据目录所在文件系统
+  ansible.builtin.shell: |
+    set -e
+    for d in /var/lib/containerd /var/lib/kubelet; do
+      fs=$(findmnt -no FSTYPE -T "$d" 2>/dev/null | head -n1)
+      echo "$d:${fs:-unknown}"
+    done
+  register: fs_check
+  changed_when: false
+
+- name: 文件系统兼容性提示（btrfs/zfs 为已知风险，需要显式处理）
+  ansible.builtin.debug:
+    msg: "{{ item }}{{ ' —— 需确认 overlay 支持后再继续（B2 验收项）' if 'btrfs' in item or 'zfs' in item else '' }}"
+  loop: "{{ fs_check.stdout_lines }}"
+
+# ---- 基础软件与仓库前置 ----
+- name: 安装基础软件包（apt 前置）
+  ansible.builtin.apt:
+    name:
+      - ca-certificates
+      - curl
+      - gnupg
+      - apt-transport-https
+      - python3-debian   # deb822_repository 模块在目标端依赖
+    state: present
+    update_cache: true
+
+# ---- /etc/hosts（最小化：localhost + 本机名，不硬编码节点映射）----
+- name: 配置 /etc/hosts（仅 localhost 与本机名；节点间解析由 CoreDNS / inventory 承担）
+  ansible.builtin.template:
+    src: hosts.j2
+    dest: /etc/hosts
+    owner: root
+    group: root
+    mode: "0644"
+
+# ---- 时间同步（chrony，B0 兼容矩阵要求）----
+- name: 安装 chrony
+  ansible.builtin.apt:
+    name: chrony
+    state: present
+  notify: restart chrony
+
+- name: 启用并启动 chronyd
+  ansible.builtin.systemd:
+    name: chronyd
+    state: started
+    enabled: true
+
+- name: 记录节点信息（供 /etc/hosts 与后续校验）
+  ansible.builtin.debug:
+    msg: "node={{ ansible_hostname }} fqdn={{ ansible_fqdn }} kernel={{ ansible_kernel }}"

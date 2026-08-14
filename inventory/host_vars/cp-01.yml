@@ -1,0 +1,4 @@
+# 单控制平面示例节点（RFC 5737 文档地址，仅实验拓扑）
+ansible_host: 192.0.2.10
+# 节点用于 kubeadm 绑定的地址（与 ansible_host 一致的实验网段）
+node_ip: 192.0.2.10

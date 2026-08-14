@@ -1,0 +1,38 @@
+# control_plane/reset.yml：集群清理（reset.yml 指向此文件）
+# 语义：清除 kubeadm/Kubernetes node bootstrap state，不删除 OS 配置
+
+- name: kubeadm reset
+  ansible.builtin.command: kubeadm reset --force
+  ignore_errors: true
+
+- name: 清理 Kubernetes 网络配置
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - /etc/cni/net.d
+    - /etc/kubernetes
+
+- name: 清理 Kubernetes 数据目录
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - /var/lib/kubelet
+    - /var/lib/etcd
+
+- name: 刷新 iptables（仅清理 kube-proxy/Calico 所在的 filter/nat 表）
+  # ⚠️ 破坏性操作：仅适用于专用实验节点；不触碰 mangle/raw 表，避免波及主机防火墙策略。
+  ansible.builtin.command: "{{ item }}"
+  loop:
+    - iptables -F
+    - iptables -t nat -F
+  ignore_errors: true
+  changed_when: true
+
+- name: 禁用 kubelet
+  ansible.builtin.systemd:
+    name: kubelet
+    state: stopped
+    enabled: false
+  ignore_errors: true

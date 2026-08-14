@@ -35,7 +35,7 @@ ALLOWLIST_FILE = ROOT / ".github" / "scan-allowlist.txt"
 SKIP_PARTS = {".git", ".github", "node_modules", ".venv", "venv", "dist", "artifacts"}
 
 # 仅扫描这些扩展名；.github 整体跳过因此脚本自身不会误报
-SCAN_SUFFIXES = (".md", ".yml", ".yaml", ".ini", ".cfg", ".toml", ".txt", ".env")
+SCAN_SUFFIXES = (".md", ".yml", ".yaml", ".ini", ".cfg", ".toml", ".txt", ".env", ".j2")
 SCAN_PREFIXES = (".env",)
 
 PRIVATE_IP = (

@@ -1,0 +1,144 @@
+# control_plane role：kubeadm init + upload-certs + 注册 join 凭据（no_log）
+# 安全边界（B0 security-boundaries.md）：token/cert-key 现场生成、短时有效、no_log
+#
+# join 凭据生成语义（与 kubeadm 官方一致，查询日 2026-08-14）：
+#   - certificate-key：kubeadm init --upload-certs / kubeadm init phase upload-certs 打印；
+#    提取必须绑定 --certificate-key 参数（裸 64-hex 可能命中 CA hash，勿用）。
+#   - worker join：kubeadm token create --ttl <TTL> --print-join-command（单行输出，无需解析）。
+#   - control-plane join：kubeadm token create --ttl <TTL> --print-join-command
+#     --certificate-key <KEY>（单行输出，无需解析）。
+
+- name: 检查集群是否已初始化（幂等前提，B2 增强用）
+  ansible.builtin.stat:
+    path: /etc/kubernetes/admin.conf
+  register: k8s_admin_conf
+
+# ==== 首次初始化分支 ====
+
+- name: 写入 kubeadm-init 配置文件（v1beta4）
+  ansible.builtin.template:
+    src: kubeadm-init.yaml.j2
+    dest: /etc/kubernetes/kubeadm-init.yaml
+    owner: root
+    group: root
+    mode: "0600"
+  when: not k8s_admin_conf.stat.exists
+
+- name: kubeadm init（首次，--upload-certs 上传证书并打印 certificate-key）
+  ansible.builtin.command: >-
+    kubeadm init
+    --config /etc/kubernetes/kubeadm-init.yaml
+    --upload-certs
+  register: kubeadm_init
+  changed_when: true
+  when: not k8s_admin_conf.stat.exists
+  no_log: true
+
+- name: 提取 certificate-key（绑定 --certificate-key 参数；回退独立 64-hex 行）
+  ansible.builtin.set_fact:
+    k8s_certificate_key: >-
+      {{ (kubeadm_init.stdout | regex_search('--certificate-key\\s+([a-f0-9]{64})', '\\1') | first)
+          if (kubeadm_init.stdout | regex_search('--certificate-key\\s+([a-f0-9]{64})', '\\1') | length > 0)
+          else (kubeadm_init.stdout | regex_search('\\n\\s*([a-f0-9]{64})\\s*\\n', '\\1') | first) }}
+  when:
+    - not k8s_admin_conf.stat.exists
+    - kubeadm_init is defined
+  no_log: true
+
+- name: 生成 worker join 命令（显式 --ttl，不依赖 kubeadm 默认值）
+  ansible.builtin.command: >-
+    kubeadm token create --ttl {{ join_token_ttl }} --print-join-command
+  register: first_worker_join
+  when: not k8s_admin_conf.stat.exists
+  changed_when: false
+  no_log: true
+
+- name: 生成 control-plane join 命令（--certificate-key 绑定）
+  ansible.builtin.command: >-
+    kubeadm token create --ttl {{ join_token_ttl }}
+    --print-join-command --certificate-key {{ k8s_certificate_key }}
+  register: first_cp_join
+  when: not k8s_admin_conf.stat.exists
+  changed_when: false
+  no_log: true
+
+- name: 注册首次 join 变量
+  ansible.builtin.set_fact:
+    k8s_worker_join_command: "{{ first_worker_join.stdout }}"
+    k8s_control_plane_join_command: "{{ first_cp_join.stdout }}"
+  when:
+    - not k8s_admin_conf.stat.exists
+    - first_worker_join is defined
+    - first_cp_join is defined
+  no_log: true
+
+# ==== 重跑分支（集群已存在：重新生成短时 token / cert-key）====
+
+- name: 重新生成 certificate-key（upload-certs 上传新证书并打印 key）
+  ansible.builtin.command: kubeadm init phase upload-certs --upload-certs
+  register: rerun_upload_certs
+  when: k8s_admin_conf.stat.exists
+  changed_when: false
+  no_log: true
+
+- name: 提取重跑 certificate-key（绑定 --certificate-key 参数；回退独立 64-hex 行）
+  ansible.builtin.set_fact:
+    k8s_certificate_key: >-
+      {{ (rerun_upload_certs.stdout | regex_search('--certificate-key\\s+([a-f0-9]{64})', '\\1') | first)
+          if (rerun_upload_certs.stdout | regex_search('--certificate-key\\s+([a-f0-9]{64})', '\\1') | length > 0)
+          else (rerun_upload_certs.stdout | regex_search('\\n\\s*([a-f0-9]{64})\\s*\\n', '\\1') | first) }}
+  when:
+    - k8s_admin_conf.stat.exists
+    - rerun_upload_certs is defined
+  no_log: true
+
+- name: 重新生成 worker join 命令
+  ansible.builtin.command: >-
+    kubeadm token create --ttl {{ join_token_ttl }} --print-join-command
+  register: rerun_worker_join
+  when: k8s_admin_conf.stat.exists
+  changed_when: false
+  no_log: true
+
+- name: 重新生成 control-plane join 命令（--certificate-key 绑定）
+  ansible.builtin.command: >-
+    kubeadm token create --ttl {{ join_token_ttl }}
+    --print-join-command --certificate-key {{ k8s_certificate_key }}
+  register: rerun_cp_join
+  when: k8s_admin_conf.stat.exists
+  changed_when: false
+  no_log: true
+
+- name: 注册重跑 join 变量
+  ansible.builtin.set_fact:
+    k8s_worker_join_command: "{{ rerun_worker_join.stdout }}"
+    k8s_control_plane_join_command: "{{ rerun_cp_join.stdout }}"
+  when:
+    - k8s_admin_conf.stat.exists
+    - rerun_worker_join is defined
+    - rerun_cp_join is defined
+  no_log: true
+
+# ==== 校验与验证 ====
+
+- name: 校验 join 凭据齐全（缺失则明确失败，不静默）
+  ansible.builtin.assert:
+    that:
+      - k8s_worker_join_command is defined
+      - k8s_worker_join_command | length > 0
+      - k8s_control_plane_join_command is defined
+      - k8s_control_plane_join_command | length > 0
+      - k8s_certificate_key is defined
+      - k8s_certificate_key | length == 64
+    fail_msg: "join 凭据生成失败：worker/CP join 命令或 certificate-key 缺失。"
+
+- name: 验证集群节点状态
+  ansible.builtin.command: kubectl get nodes
+  register: k8s_nodes
+  changed_when: false
+  environment:
+    KUBECONFIG: /etc/kubernetes/admin.conf
+
+- name: 记录集群初始化状态
+  ansible.builtin.debug:
+    msg: "控制平面就绪；join 凭据已注册（no_log，短时有效），worker 可 join。"
