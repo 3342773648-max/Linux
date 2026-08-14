@@ -1,5 +1,11 @@
 
-kubeadm是官方社区推出的一个用于快速部署kubernetes集群的工具。
+# kubeadm 高可用集群部署（历史实践）
+
+> **安全与兼容性警示**：本文仅用于学习和实验环境复盘，使用的是历史 CentOS 7、Docker 18.x
+> 和 Kubernetes 1.16 路径，不能直接作为生产部署脚本。文档中的地址、Token、证书哈希和
+> Keepalived 密钥均为占位示例；不要无条件关闭防火墙 / SELinux 或关闭仓库签名校验。
+
+kubeadm 是官方社区推出的一个用于快速部署 Kubernetes 集群的工具。
 
 这个工具能通过两条指令完成一个kubernetes集群的部署：
 
@@ -24,19 +30,15 @@ $ kubeadm join <Master节点的IP和端口 >
 
 | 角色          | IP             |
 | ------------- | -------------- |
-| master1       | 192.168.44.155 |
-| master2       | 192.168.44.156 |
-| node1         | 192.168.44.157 |
-| VIP（虚拟ip） | 192.168.44.158 |
+| master1       | 198.51.100.11 |
+| master2       | 198.51.100.12 |
+| node1         | 198.51.100.13 |
+| VIP（虚拟ip） | 198.51.100.14 |
 
 ```
-# 关闭防火墙
-systemctl stop firewalld
-systemctl disable firewalld
-
-# 关闭selinux
-sed -i 's/enforcing/disabled/' /etc/selinux/config  # 永久
-setenforce 0  # 临时
+# 先检查安全策略；根据当前 Kubernetes/CNI 文档只放行必要端口。
+firewall-cmd --list-all
+getenforce
 
 # 关闭swap
 swapoff -a  # 临时
@@ -47,10 +49,10 @@ hostnamectl set-hostname <hostname>
 
 # 在master添加hosts
 cat >> /etc/hosts << EOF
-192.168.44.158    master.k8s.io   k8s-vip
-192.168.44.155    master01.k8s.io master1
-192.168.44.156    master02.k8s.io master2
-192.168.44.157    node01.k8s.io   node1
+198.51.100.14    master.k8s.io   k8s-vip
+198.51.100.11    master01.k8s.io master1
+198.51.100.12    master02.k8s.io master2
+198.51.100.13    node01.k8s.io   node1
 EOF
 
 # 将桥接的IPv4流量传递到iptables的链
@@ -105,10 +107,10 @@ vrrp_instance VI_1 {
     advert_int 1
     authentication {
         auth_type PASS
-        auth_pass ceb1b3ec013d66163d6ab
+        auth_pass <KEEPALIVED_AUTH_PASS>
     }
     virtual_ipaddress {
-        192.168.44.158
+        198.51.100.14
     }
     track_script {
         check_haproxy
@@ -144,10 +146,10 @@ vrrp_instance VI_1 {
     advert_int 1
     authentication {
         auth_type PASS
-        auth_pass ceb1b3ec013d66163d6ab
+        auth_pass <KEEPALIVED_AUTH_PASS>
     }
     virtual_ipaddress {
-        192.168.44.158
+        198.51.100.14
     }
     track_script {
         check_haproxy
@@ -253,14 +255,14 @@ frontend kubernetes-apiserver
 backend kubernetes-apiserver
     mode        tcp
     balance     roundrobin
-    server      master01.k8s.io   192.168.44.155:6443 check
-    server      master02.k8s.io   192.168.44.156:6443 check
+    server      master01.k8s.io   198.51.100.11:6443 check
+    server      master02.k8s.io   198.51.100.12:6443 check
 #---------------------------------------------------------------------
 # collection haproxy statistics message
 #---------------------------------------------------------------------
 listen stats
     bind                 *:1080
-    stats auth           admin:awesomePassword
+    stats auth           admin:<HAPROXY_STATS_PASSWORD>
     stats refresh        5s
     stats realm          HAProxy\ Statistics
     stats uri            /admin?stats
@@ -295,7 +297,7 @@ Kubernetes默认CRI（容器运行时）为Docker，因此先安装Docker。
 ### 5.1 安装Docker
 
 ```
-$ wget https://mirrors.aliyun.com/docker-ce/linux/centos/docker-ce.repo -O /etc/yum.repos.d/docker-ce.repo
+$ wget <CONTAINER_RUNTIME_REPOSITORY_FILE> -O /etc/yum.repos.d/docker-ce.repo
 $ yum -y install docker-ce-18.06.1.ce-3.el7
 $ systemctl enable docker && systemctl start docker
 $ docker --version
@@ -305,7 +307,7 @@ Docker version 18.06.1-ce, build e68fc7a
 ```
 $ cat > /etc/docker/daemon.json << EOF
 {
-  "registry-mirrors": ["https://b9pmyelo.mirror.aliyuncs.com"]
+  "registry-mirrors": ["<REGISTRY_MIRROR_URL>"]
 }
 EOF
 ```
@@ -318,8 +320,8 @@ $ cat > /etc/yum.repos.d/kubernetes.repo << EOF
 name=Kubernetes
 baseurl=https://mirrors.aliyun.com/kubernetes/yum/repos/kubernetes-el7-x86_64
 enabled=1
-gpgcheck=0
-repo_gpgcheck=0
+gpgcheck=1
+repo_gpgcheck=1
 gpgkey=https://mirrors.aliyun.com/kubernetes/yum/doc/yum-key.gpg https://mirrors.aliyun.com/kubernetes/yum/doc/rpm-package-key.gpg
 EOF
 ```
@@ -353,9 +355,9 @@ apiServer:
     - master1
     - master2
     - master.k8s.io
-    - 192.168.44.158
-    - 192.168.44.155
-    - 192.168.44.156
+    - 198.51.100.14
+    - 198.51.100.11
+    - 198.51.100.12
     - 127.0.0.1
   extraArgs:
     authorization-mode: Node,RBAC
@@ -402,11 +404,11 @@ $ kubectl get pods -n kube-system
 
 
 
-**按照提示保存以下内容，一会要使用：**
+**按照提示保存当前环境生成的 join 命令；下面只展示参数形状：**
 
 ```bash
-kubeadm join master.k8s.io:16443 --token jv5z7n.3y1zi95p952y9p65 \
-    --discovery-token-ca-cert-hash sha256:403bca185c2f3a4791685013499e7ce58f9848e2213e27194b75a2e3293d8812 \
+kubeadm join master.k8s.io:16443 --token <BOOTSTRAP_TOKEN> \
+    --discovery-token-ca-cert-hash sha256:<CA_CERT_HASH> \
     --control-plane 
 ```
 
@@ -450,16 +452,17 @@ kubectl get pods -n kube-system
 
 ### 8.1 复制密钥及相关文件
 
-从master1复制密钥及相关文件到master2
+从 master1 复制密钥及相关文件到 master2。该做法只作为历史记录，当前推荐使用
+`kubeadm join --control-plane` 的证书密钥流程，并通过安全通道传输临时凭据。
 
 ```bash
-# ssh root@192.168.44.156 mkdir -p /etc/kubernetes/pki/etcd
+# ssh root@198.51.100.12 mkdir -p /etc/kubernetes/pki/etcd
 
-# scp /etc/kubernetes/admin.conf root@192.168.44.156:/etc/kubernetes
+# scp /etc/kubernetes/admin.conf root@198.51.100.12:/etc/kubernetes
    
-# scp /etc/kubernetes/pki/{ca.*,sa.*,front-proxy-ca.*} root@192.168.44.156:/etc/kubernetes/pki
+# scp /etc/kubernetes/pki/{ca.*,sa.*,front-proxy-ca.*} root@198.51.100.12:/etc/kubernetes/pki
    
-# scp /etc/kubernetes/pki/etcd/ca.* root@192.168.44.156:/etc/kubernetes/pki/etcd
+# scp /etc/kubernetes/pki/etcd/ca.* root@198.51.100.12:/etc/kubernetes/pki/etcd
 ```
 
 ### 8.2 master2加入集群
@@ -467,7 +470,7 @@ kubectl get pods -n kube-system
 执行在master1上init后输出的join命令,需要带上参数`--control-plane`表示把master控制节点加入集群
 
 ```
-kubeadm join master.k8s.io:16443 --token ckf7bs.30576l0okocepg8b     --discovery-token-ca-cert-hash sha256:19afac8b11182f61073e254fb57b9f19ab4d798b70501036fc69ebef46094aba --control-plane
+kubeadm join master.k8s.io:16443 --token <BOOTSTRAP_TOKEN>     --discovery-token-ca-cert-hash sha256:<CA_CERT_HASH> --control-plane
 ```
 
 检查状态
@@ -487,7 +490,7 @@ kubectl get pods --all-namespaces
 向集群添加新节点，执行在kubeadm init输出的kubeadm join命令：
 
 ```
-kubeadm join master.k8s.io:16443 --token ckf7bs.30576l0okocepg8b     --discovery-token-ca-cert-hash sha256:19afac8b11182f61073e254fb57b9f19ab4d798b70501036fc69ebef46094aba
+kubeadm join master.k8s.io:16443 --token <BOOTSTRAP_TOKEN>     --discovery-token-ca-cert-hash sha256:<CA_CERT_HASH>
 ```
 
 **集群网络重新安装，因为添加了新的node节点**
@@ -513,7 +516,5 @@ $ kubectl get pod,svc
 ```
 
 访问地址：http://NodeIP:Port  
-
-
 
 

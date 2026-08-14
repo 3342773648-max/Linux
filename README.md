@@ -1,28 +1,132 @@
-# Kubernetes 集群自动化部署实践仓库
+# Kubernetes Cluster Bootstrap
 
-![CI](https://github.com/guiyi-labs/kubernetes-cluster-bootstrap/actions/workflows/ci.yml/badge.svg)
+[![CI](https://github.com/guiyi-labs/kubernetes-cluster-bootstrap/actions/workflows/ci.yml/badge.svg)](https://github.com/guiyi-labs/kubernetes-cluster-bootstrap/actions/workflows/ci.yml)
+![Kubernetes](https://img.shields.io/badge/Kubernetes-kubeadm-326CE5?logo=kubernetes&logoColor=white)
+![Ansible](https://img.shields.io/badge/Ansible-automation-EE0000?logo=ansible&logoColor=white)
+![Linux](https://img.shields.io/badge/Linux-cluster%20delivery-FCC624?logo=linux&logoColor=black)
 
-本仓库为**Kubernetes(K8s)集群全场景部署实战教程**，完整覆盖单机快速部署、高可用集群部署、Ansible自动化一键部署三大主流K8s搭建方案，全部为可落地、可复现的实战操作文档。
+> 基于 kubeadm 与 Ansible 的 Kubernetes 集群交付与引导实践。
 
-## 📚 仓库文档目录
-1. [使用kubeadm快速部署一个K8s集群](./使用kubeadm快速部署一个K8s集群.md)
-   单机单节点K8s集群快速搭建教程，适合新手入门、测试环境快速部署
-2. [使用kubeadm搭建高可用的K8s集群](./使用kubeadm搭建高可用的K8s集群.md)
-   多控制平面高可用K8s集群完整部署方案，适配生产环境高可用需求
-3. [Ansible自动化部署K8S集群](./Ansible自动化部署K8S集群.md)
-   Ansible剧本自动化批量部署K8s集群，实现免人工交互式一键部署，高效运维管理
+## 项目定位
 
-## ✨ 项目特点
-- 全部基于官方kubeadm原生方案，无第三方魔改，符合Linux基金会K8s官方标准
-- 从入门单机到生产高可用、从手动部署到Ansible自动化运维，技术路径完整递进
-- 步骤详细可复现，附带环境要求、操作命令、排错说明，开箱即用
-- 贴合云原生开源生态，持续学习Kubernetes、Linux、容器自动化运维开源技术
+本仓库只负责 Kubernetes 的 **Day 0 / Day 1 交付**：从 Linux 节点预检、容器运行时和 kubeadm
+安装，到控制平面、Worker、CNI、HA 入口和安装后验收。最终输出可交接的集群配置与验收报告，
+供其他平台注册和使用。
 
-## 🎯 适用人群
-Linux运维工程师、云原生初学者、K8s技术学习者、在校计算机专业学生，用于学习Kubernetes集群部署、运维、自动化开源技术实践。
+```text
+主机预检 → containerd → kubeadm init/join → CNI / HA → 集群验收 → 交付 kubeconfig
+```
 
-## 📌 技术栈
-Linux、Kubernetes(K8s)、kubeadm、Ansible、容器云原生、开源运维自动化
+## 与相关项目的边界
 
-## 开源声明
-本项目所有教程均为个人学习实践总结，遵循开源共享精神，欢迎学习交流、Star收藏与社区贡献。
+| 阶段 | 仓库 | 负责什么 |
+|---|---|---|
+| Day 0/1 | `kubernetes-cluster-bootstrap`（本仓库） | 创建集群、节点加入、CNI、控制平面高可用和交付验收 |
+| Linux 运行期 | [`devops-automation`](https://github.com/guiyi-labs/devops-automation) | SSH 主机、systemd、进程、磁盘、批量任务、备份和主机监控 |
+| Kubernetes 运行期 | [`aiops-platform`](https://github.com/guiyi-labs/aiops-platform) | 多集群、工作负载、可观测、诊断、事故响应和受控修复 |
+
+本仓库不提供长期监控、AIOps、事故响应、Pod / Deployment 管理面板或通用 Web 运维控制台。
+集群创建完成后，使用验收结果和 kubeconfig 将集群交给运行期平台；真实 kubeconfig 永不提交到 Git。
+
+## 当前状态
+
+当前仓库仍处于**部署教程与自动化方案基线**阶段：
+
+- 已有单节点、HA 和 Ansible 部署路径的文档整理；
+- GitHub Actions 当前只做 Markdown 链接检查；
+- 仓库尚未提供完整的 `inventory/`、`roles/`、`playbooks/` 自动化实现；
+- 现有文档包含历史版本和实验环境命令，不能直接视为当前生产部署合同；
+- “生产高可用”“一键部署”等能力，待自动化脚本、幂等复跑和真实多节点验收完成后再恢复声明。
+
+## 文档入口
+
+| 文档 | 当前用途 |
+|---|---|
+| [kubeadm 单节点部署](./使用kubeadm快速部署一个K8s集群.md) | 学习和测试环境的手动部署参考 |
+| [kubeadm 高可用部署](./使用kubeadm搭建高可用的K8s集群.md) | HA 拓扑和组件配置的历史实践参考 |
+| [Ansible 自动化部署](./Ansible自动化部署K8S集群.md) | Ansible 概念、Inventory 和 Playbook 设计参考 |
+
+旧文档中的 Kubernetes、Docker、操作系统和镜像版本可能已经过时，执行前必须根据兼容矩阵复核。
+文档中的 IP、Token、密码和示例凭据只能作为占位符，不能复制到真实环境。
+
+## 安全与兼容性警示
+
+仓库中的三篇教程是历史实践记录，不是当前生产部署脚本。执行任何命令前，必须根据目标
+发行版、Kubernetes 版本、容器运行时、CNI 和组织安全基线重新验证：
+
+- 不要复用文档中的 kubeadm Token、证书哈希、Keepalived 密钥或 SSH 凭据；join 命令必须由当前集群现场生成。
+- 不要为了绕过问题而关闭防火墙 / SELinux，或把 YUM 仓库签名校验改为关闭；只放行必要端口并保留安全校验。
+- CentOS 7、Docker 18.x 和 Kubernetes 1.16/1.18 仅代表历史环境，当前重建路线优先使用受支持的 Linux、containerd 和 Kubernetes 版本。
+- 真实 kubeconfig、证书、Token、执行日志和节点地址不得提交到 Git。
+
+## 重建路线
+
+### B0：兼容矩阵与安全清理
+
+- 固定首个支持的 Linux 发行版和 Kubernetes minor 版本；
+- 从 Docker 迁移到 containerd 的当前推荐路径；
+- 清理硬编码 Token、Keepalived 密码、真实拓扑地址和旧镜像源；
+- 不再使用 `gpgcheck=0`、无条件关闭防火墙 / SELinux 等危险示例；
+- 增加 `compatibility.md` 和明确的实验环境边界。
+
+### B1：真实 Ansible 交付结构
+
+```text
+inventory/
+group_vars/
+roles/
+  preflight/
+  containerd/
+  kubeadm/
+  control_plane/
+  worker/
+  cni/
+  load_balancer/
+playbooks/
+  site.yml
+  reset.yml
+  upgrade.yml
+scripts/
+  verify-cluster.sh
+```
+
+先支持一条可信路径，再扩展系统版本和网络插件，不同时维护多套未验证脚本。
+
+### B2：幂等与验收
+
+- Ansible 第二次执行无不必要变更；
+- 节点预检包含 CPU、内存、磁盘、时间同步、Swap、内核模块、端口和网络连通性；
+- 安装后验证 Node Ready、CoreDNS、CNI、Service、DNS 和基础 Pod 调度；
+- 支持 reset / cleanup，不污染下一次演练；
+- 记录每一步耗时、变更摘要、失败原因和最终 cluster handoff 报告。
+
+### B3：HA 与升级证据
+
+- 高可用模式使用满足 etcd quorum 的控制平面数量；
+- HAProxy / Keepalived 配置使用 Secret 或变量注入；
+- 验证控制平面单节点故障后的 API 可用性；
+- 固定 Kubernetes 升级和回滚策略，不在同一批次混入未经验证的跨大版本升级；
+- 形成可复现的多节点虚拟机演练报告。
+
+### B4：工程交付
+
+- `ansible-lint`、YAML lint、Playbook syntax check 和 Markdown link check 纳入 CI；
+- 记录无密钥的脱敏执行日志；
+- 发布兼容矩阵、安装手册、reset 手册和故障排查入口；
+- 通过 tag 发布一个真实可复现的 bootstrap baseline；
+- 将 kubeconfig、证书、Token 和节点运行日志排除在仓库之外。
+
+## 完成标准
+
+只有同时满足以下条件，才能把仓库描述为“可复现集群交付”：
+
+- [ ] 至少一个 Linux 发行版和一个 Kubernetes 版本有明确兼容声明；
+- [ ] 存在可执行的 Ansible inventory、roles 和 playbooks；
+- [ ] 新环境安装成功，第二次执行保持幂等；
+- [ ] 单节点和 HA 模式都有安装后验收；
+- [ ] reset / cleanup 可重复执行；
+- [ ] CI 能发现 YAML、Playbook 和文档链接问题；
+- [ ] 文档中不存在可直接使用的真实凭据或硬编码集群 Token；
+- [ ] 结果有脱敏日志、版本 tag 和交接说明。
+
+在这些条件满足前，本仓库定位为 Kubernetes 部署学习与方案沉淀，不宣称生产级交付能力。

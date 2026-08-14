@@ -1,6 +1,10 @@
-《Ansible自动化部署K8S集群》
+# Ansible 自动化部署 K8S 集群（历史实践）
 
-# 一、Ansible自动化部署K8S集群
+> **安全与兼容性警示**：本文是 Ansible 和 Kubernetes 集群交付的历史学习材料，当前仓库还没有
+> 可直接执行的 `inventory/`、`roles/`、`playbooks/` 交付实现。示例地址、用户和密钥路径均为占位符；
+> 不要把密码写入 Inventory，不要提交 kubeconfig 或私钥，也不要无条件关闭防火墙 / SELinux。
+
+# 一、Ansible 自动化部署 K8S 集群
 
 ## 1.1 Ansible介绍
 
@@ -29,14 +33,14 @@ Ansible是一种IT自动化工具。它可以配置系统，部署软件以及�
 [webservers]
 alpha.example.org
 beta.example.org
-192.168.1.100
+192.0.2.100
 www[001:006].example.com
 
 [dbservers]
 db01.intranet.mydomain.net
 db02.intranet.mydomain.net
-10.25.1.56
-10.25.1.57
+192.0.2.56
+192.0.2.57
 db-[99:101]-node.example.com
 ```
 
@@ -54,20 +58,22 @@ SSH密码认证：
 
 ```
 [webservers]
-192.168.1.100:22 ansible_ssh_user=root ansible_ssh_pass=’123456’
-192.168.1.101:22 ansible_ssh_user=root ansible_ssh_pass=’123456’
+192.0.2.100:22 ansible_user=ops
+192.0.2.101:22 ansible_user=ops
+
+# 密码通过 --ask-pass、Vault 或外部 Secret 注入，不写入 Inventory。
 ```
 
 SSH密钥对认证：
 
 ```
 [webservers]
-10.206.240.111:22 ansible_ssh_user=root ansible_ssh_key=/root/.ssh/id_rsa 
-10.206.240.112:22 ansible_ssh_user=root
+192.0.2.111:22 ansible_user=ops ansible_private_key_file=~/.ssh/id_ed25519
+192.0.2.112:22 ansible_user=ops
 
 也可以ansible.cfg在配置文件中指定：
 [defaults]
-private_key_file = /root/.ssh/id_rsa  # 默认路径
+private_key_file = ~/.ssh/id_ed25519  # 示例路径，按本机密钥配置
 ```
 
 ### 2、常用选项
@@ -257,7 +263,7 @@ https://docs.ansible.com/ansible/latest/user_guide/playbooks.html
   vars:
     http_port: 80
     server_name: www.ctnrs.com
-  remote_user: root
+  remote_user: ops
   gather_facts: false
   tasks:
   - name: 安装nginx最新版
@@ -277,12 +283,12 @@ https://docs.ansible.com/ansible/latest/user_guide/playbooks.html
 
 ```
 - hosts: webservers
-  remote_user: lizhenliang
+  remote_user: ops
   become: yes
   become_user: root
 ```
 
-ansible-playbook nginx.yaml -u lizhenliang -k -b -K 
+ansible-playbook nginx.yaml -u ops -k -b -K 
 
 ### 2、定义变量
 
@@ -300,11 +306,11 @@ ansible-playbook nginx.yaml -u lizhenliang -k -b -K
 
 ```
 [webservers]
-192.168.1.100 ansible_ssh_user=root hostname=web1
-192.168.1.100 ansible_ssh_user=root hostname=web2
+192.0.2.100 ansible_user=ops hostname=web1
+192.0.2.101 ansible_user=ops hostname=web2
 
 [webservers:vars]
-ansible_ssh_user=root hostname=web1
+ansible_user=ops hostname=web1
 ```
 
 - **单文件存储**
@@ -399,9 +405,9 @@ ansible-playbook example.yml --skip-tags "install"
 
 ```
 tasks:
-- name: 只在192.168.1.100运行任务
+- name: 只在192.0.2.100运行任务
   debug: msg="{{ansible_default_ipv4.address}}"
-  when: ansible_default_ipv4.address == '192.168.1.100'
+  when: ansible_default_ipv4.address == '192.0.2.100'
 ```
 
 循环：
@@ -586,14 +592,14 @@ roles/
 1. **服务器规划**
 | **角色**                | **IP**                             | **组件**                                                     |
 | ----------------------- | ---------------------------------- | ------------------------------------------------------------ |
-| k8s-master1             | 192.168.31.61                      | kube-apiserver  kube-controller-manager  kube-scheduler  etcd |
-| k8s-master2             | 192.168.31.62                      | kube-apiserver  kube-controller-manager  kube-scheduler      |
-| k8s-node1               | 192.168.31.63                      | kubelet  kube-proxy  docker  etcd                            |
-| k8s-node2               | 192.168.31.66                      | kubelet  kube-proxy  docker  etcd                            |
-| Load Balancer（Master） | 192.168.31.61  192.168.31.60 (VIP) | nginx  keepalived                                            |
-| Load Balancer（Backup） | 192.168.31.62                      | nginx keepalived    |
+| k8s-master1             | 198.51.100.11                      | kube-apiserver  kube-controller-manager  kube-scheduler  etcd |
+| k8s-master2             | 198.51.100.12                      | kube-apiserver  kube-controller-manager  kube-scheduler      |
+| k8s-node1               | 198.51.100.13                      | kubelet  kube-proxy  docker  etcd                            |
+| k8s-node2               | 198.51.100.14                      | kubelet  kube-proxy  docker  etcd                            |
+| Load Balancer（Master） | 198.51.100.11  198.51.100.10 (VIP) | nginx  keepalived                                            |
+| Load Balancer（Backup） | 198.51.100.12                      | nginx keepalived    |
 2. **系统初始化**
-   1. 关闭selinux，firewalld
+   1. 按发行版安全基线检查并配置 SELinux、firewalld 必要策略，不要无条件关闭
    2. 关闭swap
    3. 时间同步
    4. 写hosts
@@ -678,11 +684,11 @@ cert_hosts:
 单Master版：
 
 ```
-ansible-playbook -i hosts single-master-deploy.yml -uroot -k
+ansible-playbook -i hosts single-master-deploy.yml -u ops -k
 ```
 多Master版：
 ```
-ansible-playbook -i hosts multi-master-deploy.yml -uroot -k
+ansible-playbook -i hosts multi-master-deploy.yml -u ops -k
 ```
 
 ### 6、部署控制
@@ -690,7 +696,7 @@ ansible-playbook -i hosts multi-master-deploy.yml -uroot -k
 
 例如：只运行部署插件
 ```
-ansible-playbook -i hosts single-master-deploy.yml -uroot -k --tags addons
+ansible-playbook -i hosts single-master-deploy.yml -u ops -k --tags addons
 ```
 
 
