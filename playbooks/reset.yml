@@ -4,6 +4,7 @@
 - name: B1 - 清理 Worker 节点
   hosts: worker
   gather_facts: false
+  become: true
   tasks:
     - name: worker 节点 reset
       ansible.builtin.import_role:
@@ -13,6 +14,7 @@
 - name: B1 - 清理控制平面节点
   hosts: control_plane
   gather_facts: false
+  become: true
   tasks:
     - name: 控制平面 reset
       ansible.builtin.import_role:
@@ -22,6 +24,7 @@
 - name: B1 - 清理容器运行时（containerd 保留、仅停用数据目录）
   hosts: all
   gather_facts: false
+  become: true
   tasks:
     - name: 停止并禁用 containerd
       ansible.builtin.systemd:

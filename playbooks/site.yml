@@ -6,6 +6,7 @@
   hosts: all
   gather_facts: true
   order: sorted
+  become: true
   roles:
     - role: preflight
     - role: containerd
@@ -13,16 +14,19 @@
 
 - name: B1 - 第一个控制平面：kubeadm init + 注册 join 凭据
   hosts: control_plane[0]
+  become: true
   roles:
     - role: control_plane
 
 - name: B1 - Worker 节点：kubeadm join
   hosts: worker
+  become: true
   roles:
     - role: worker
 
 - name: B1 - 第一个控制平面：安装 Calico CNI
   hosts: control_plane[0]
+  become: true
   roles:
     - role: cni
 

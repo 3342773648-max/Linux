@@ -8,11 +8,11 @@
       - ansible_distribution_major_version == "24"
     fail_msg: "首条支持路径仅支持 Ubuntu 24.04 LTS，当前为 {{ ansible_distribution }} {{ ansible_distribution_version }}"
 
-- name: 检查架构为 x86_64
+- name: 检查架构属于支持列表（首条路径 x86_64；实验室允许 arm64 扩展，见 change record）
   ansible.builtin.assert:
     that:
-      - ansible_architecture == "x86_64"
-    fail_msg: "首条支持路径仅支持 x86_64（B0 兼容矩阵）"
+      - ansible_architecture in k8s_accepted_arches
+    fail_msg: "架构 {{ ansible_architecture }} 不在支持列表 {{ k8s_accepted_arches }} 内"
 
 - name: 检查内核版本 ≥ 5.4（cgroup v2 / Ubuntu 24.04 默认满足）
   ansible.builtin.assert:

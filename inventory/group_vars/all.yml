@@ -12,6 +12,12 @@ containerd_version: "2.3"             # B1 锚点：2.3.x deb
 calico_version: "3.32.1"
 image_repository: "registry.k8s.io"
 
+# 允许的节点架构。B0 兼容矩阵首条路径为 x86_64；
+# 本实验室用 arm64 虚拟机（Lima）做 B2 真实验收，故扩展为两者（见 change record）。
+k8s_accepted_arches:
+  - x86_64
+  - aarch64
+
 # === 网络 ===
 pod_network_cidr: "10.244.0.0/16"    # Calico 建议的 Pod 网段（避免与 RFC1918 实验网段冲突）
 service_network_cidr: "10.96.0.0/16" # kubeadm 默认 Service 网段
