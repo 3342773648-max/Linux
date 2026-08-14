@@ -1,4 +1,7 @@
 # Kubernetes 集群自动化部署实践仓库
+
+![CI](https://github.com/guiyi-labs/kubernetes-cluster-bootstrap/actions/workflows/ci.yml/badge.svg)
+
 本仓库为**Kubernetes(K8s)集群全场景部署实战教程**，完整覆盖单机快速部署、高可用集群部署、Ansible自动化一键部署三大主流K8s搭建方案，全部为可落地、可复现的实战操作文档。
 
 ## 📚 仓库文档目录
