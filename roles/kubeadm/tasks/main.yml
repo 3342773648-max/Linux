@@ -9,7 +9,6 @@
     chmod a+r /etc/apt/keyrings/kubernetes-apt-keyring.asc
   args:
     creates: /etc/apt/keyrings/kubernetes-apt-keyring.asc
-  changed_when: true
 
 - name: 添加 Kubernetes 官方 apt 源（v1.36 stable，deb822 格式）
   ansible.builtin.deb822_repository:
@@ -20,6 +19,7 @@
     components: []
     signed_by: /etc/apt/keyrings/kubernetes-apt-keyring.asc
     state: present
+  register: kube_repo_state
 
 - name: 安装 kubelet / kubeadm / kubectl（锚点 {{ kubernetes_version }}）
   ansible.builtin.apt:
@@ -45,20 +45,20 @@
   changed_when: false
 
 - name: 验证 kubectl 版本
-  ansible.builtin.command: kubectl version --client -o jsonpath='{.clientVersion.gitVersion}'
+  ansible.builtin.shell: kubectl version --client -o json | python3 -c 'import json,sys;print(json.load(sys.stdin)["clientVersion"]["gitVersion"].lstrip("v"))'
   register: kubectl_version_check
   changed_when: false
 
-- name: 断言 kubeadm 版本与锚点一致
+- name: 断言 kubeadm 版本与锚点一致（容忍 v 前缀）
   ansible.builtin.assert:
     that:
-      - kubeadm_version_check.stdout == kubernetes_version
+      - kubeadm_version_check.stdout | regex_replace('^v', '') == kubernetes_version
     fail_msg: "kubeadm 版本 {{ kubeadm_version_check.stdout }} 与锚点 {{ kubernetes_version }} 不一致"
 
-- name: 断言 kubectl 版本与锚点一致
+- name: 断言 kubectl 版本与锚点一致（容忍 v 前缀）
   ansible.builtin.assert:
     that:
-      - kubectl_version_check.stdout == "v" ~ kubectl_version
+      - kubectl_version_check.stdout | regex_replace('^v', '') == kubectl_version
     fail_msg: "kubectl 版本 {{ kubectl_version_check.stdout }} 与锚点 v{{ kubectl_version }} 不一致"
 
 - name: 启用 kubelet（服务由后续 init/join 启动）

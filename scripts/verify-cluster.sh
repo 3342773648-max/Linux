@@ -31,10 +31,10 @@ else
   note "系统 Pod 正常"
 fi
 
-note "3. Calico 组件就绪（Tigerastatus）"
+note "3. Calico 组件就绪（Tigerastatus，AVAILABLE 列）"
 if kubectl get tigerastatus --no-headers >/dev/null 2>&1; then
   kubectl get tigerastatus
-  if ! kubectl get tigerastatus --no-headers | awk '$4=="True" && $4!=""' | grep -q .; then
+  if ! kubectl get tigerastatus --no-headers | awk '$2=="True"' | grep -q .; then
     echo "Calico 组件未全部 Available"; fail=1
   fi
 else
@@ -49,8 +49,10 @@ echo "CoreDNS clusterIP=$kube_dns_ip"
 note "5. DNS 解析验证（临时 Pod，固定 busybox tag + 自动清理）"
 DNS_IMG="busybox:1.36"
 kubectl delete pod dns-test --ignore-not-found --wait=false >/dev/null 2>&1 || true
+# busybox nslookup 不走 search domain，必须用全限定名
 dns_test=$(kubectl run dns-test -n default \
-  --image="$DNS_IMG" --restart=Never --rm -i --command -- nslookup kubernetes.default.svc \
+  --image="$DNS_IMG" --restart=Never --rm -i --command -- \
+  nslookup kubernetes.default.svc.cluster.local \
   >/dev/null 2>&1 && echo OK || echo FAIL)
 kubectl delete pod dns-test --ignore-not-found >/dev/null 2>&1 || true
 echo "DNS test: $dns_test"
@@ -58,7 +60,7 @@ echo "DNS test: $dns_test"
 
 note "验证结果汇总"
 if [ "$fail" -eq 0 ]; then
-  echo "集群验收：全部通过（B1 结构 + 运行态健康）。"
+  echo "集群验收：全部通过（真实集群运行态健康）。"
 else
   echo "存在失败项，详见上方检查点。"
   exit 1

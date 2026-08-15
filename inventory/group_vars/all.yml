@@ -42,5 +42,7 @@ containerd_systemd_cgroup: true       # 2.x 路径：[plugins.'io.containerd.cri
 
 # === 仓库源 ===
 containerd_apt_repo: "https://download.docker.com/linux/ubuntu"
-containerd_apt_suite: "stable"
+# Docker 官方 apt 仓库的 suite 使用发行版代号（如 noble），component 才是 stable；
+# 未显式覆盖时由角色按 ansible_distribution_release 推导。
+# containerd_apt_suite: "noble"
 kubeadm_apt_repo: "https://pkgs.k8s.io/core:/stable:/v1.36/deb/"

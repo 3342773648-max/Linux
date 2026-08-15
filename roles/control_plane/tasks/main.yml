@@ -2,11 +2,14 @@
 # 安全边界（B0 security-boundaries.md）：token/cert-key 现场生成、短时有效、no_log
 #
 # join 凭据生成语义（与 kubeadm 官方一致，查询日 2026-08-14）：
-#   - certificate-key：kubeadm init --upload-certs / kubeadm init phase upload-certs 打印；
-#    提取必须绑定 --certificate-key 参数（裸 64-hex 可能命中 CA hash，勿用）。
-#   - worker join：kubeadm token create --ttl <TTL> --print-join-command（单行输出，无需解析）。
+#   - certificate-key：kubeadm init --upload-certs / kubeadm init phase upload-certs
+#     输出格式："[upload-certs] Using certificate key:\n<64-hex>"，独立 64-hex 行。
+#   - worker join：kubeadm token create --ttl <TTL> --print-join-command（单行输出）。
 #   - control-plane join：kubeadm token create --ttl <TTL> --print-join-command
-#     --certificate-key <KEY>（单行输出，无需解析）。
+#     --certificate-key <KEY>（单行输出）。
+#
+# 提取策略：用 stdout_lines + select('match', '^[a-f0-9]{64}$') 匹配独立 64-hex 行，
+# 无需 regex_findall multiline，对 Jinja 求值顺序零依赖。
 
 - name: 检查集群是否已初始化（幂等前提，B2 增强用）
   ansible.builtin.stat:
@@ -14,6 +17,14 @@
   register: k8s_admin_conf
 
 # ==== 首次初始化分支 ====
+
+- name: 确保 /etc/kubernetes 目录存在（reset 后可能被清空）
+  ansible.builtin.file:
+    path: /etc/kubernetes
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
 
 - name: 写入 kubeadm-init 配置文件（v1beta4）
   ansible.builtin.template:
@@ -34,12 +45,13 @@
   when: not k8s_admin_conf.stat.exists
   no_log: true
 
-- name: 提取 certificate-key（绑定 --certificate-key 参数；回退独立 64-hex 行）
+- name: 提取 certificate-key（kubeadm 输出中独立 64-hex 行 = cert-key）
   ansible.builtin.set_fact:
     k8s_certificate_key: >-
-      {{ (kubeadm_init.stdout | regex_search('--certificate-key\\s+([a-f0-9]{64})', '\\1') | first)
-          if (kubeadm_init.stdout | regex_search('--certificate-key\\s+([a-f0-9]{64})', '\\1') | length > 0)
-          else (kubeadm_init.stdout | regex_search('\\n\\s*([a-f0-9]{64})\\s*\\n', '\\1') | first) }}
+      {{ kubeadm_init.stdout_lines
+         | map('trim')
+         | select('match', '^[a-f0-9]{64}$')
+         | first }}
   when:
     - not k8s_admin_conf.stat.exists
     - kubeadm_init is defined
@@ -81,12 +93,13 @@
   changed_when: false
   no_log: true
 
-- name: 提取重跑 certificate-key（绑定 --certificate-key 参数；回退独立 64-hex 行）
+- name: 提取重跑 certificate-key（独立 64-hex 行 = cert-key）
   ansible.builtin.set_fact:
     k8s_certificate_key: >-
-      {{ (rerun_upload_certs.stdout | regex_search('--certificate-key\\s+([a-f0-9]{64})', '\\1') | first)
-          if (rerun_upload_certs.stdout | regex_search('--certificate-key\\s+([a-f0-9]{64})', '\\1') | length > 0)
-          else (rerun_upload_certs.stdout | regex_search('\\n\\s*([a-f0-9]{64})\\s*\\n', '\\1') | first) }}
+      {{ rerun_upload_certs.stdout_lines
+         | map('trim')
+         | select('match', '^[a-f0-9]{64}$')
+         | first }}
   when:
     - k8s_admin_conf.stat.exists
     - rerun_upload_certs is defined

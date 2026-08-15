@@ -50,9 +50,18 @@ B1「真实 Ansible 交付结构」**实施已就绪**（2026-08-14）：
 - `playbooks/`（site / reset / upgrade）；`scripts/verify-cluster.sh`；
 - CI 已加 `ansible-playbook --syntax-check` 与 `ansible-inventory` 门禁。
 
-> B1 交付的是**真实的自动化骨架与执行逻辑**，通过 Ansible 语法校验；
-> **尚未在真实 Ubuntu 24.04 + K8s 1.36.2 环境运行验收**。真实多节点部署与幂等性属
-> B2，HA/升级执行属 B3。
+> B1 交付的是**真实的自动化骨架与执行逻辑**，通过 Ansible 语法校验；真实验收属 B2。
+
+B2「真实环境验收与幂等交付」**已完成**（2026-08-15，见 [`docs/changes/2026-08-15-b2-real-cluster-acceptance.md`](./docs/changes/2026-08-15-b2-real-cluster-acceptance.md)）：
+
+- 在真实 Ubuntu 24.04 LTS 双节点（1 CP + 1 worker，Lima arm64）完成 `site.yml` 全量部署；
+- `verify-cluster.sh` 全量验收通过：节点 2/2 Ready、系统 Pod 正常、Calico Tigerastatus 全 True、集群 DNS 解析 OK；
+- 二次重跑全量幂等（changed=0）；
+- `reset.yml` 拆集群 → `site.yml` 重建 → 再验收再幂等，证明可重复交付；
+- 真实环境暴露并修复：containerd 代理 daemon-reload、certificate-key 提取鲁棒化、CNI 任务 NO_PROXY、
+  CNI 本地清单化、多处幂等缺口、reset 后重建目录补齐。
+
+> 部署输出即真实集群可运行；验收证据、修复记录与 host_vars 连接说明见 B2 change record。
 
 ## 文档入口
 
@@ -74,10 +83,20 @@ B1「真实 Ansible 交付结构」**实施已就绪**（2026-08-14）：
 | `playbooks/`（site / reset / upgrade） | ✅ 已建（syntax 校验通过） |
 | `scripts/verify-cluster.sh` | ✅ 已建（验收辅助，B2 扩展） |
 | CI 语法门禁（ansible-playbook syntax-check + inventory） | ✅ 已加 |
-| 真实单控制平面 + Worker 验收 | ⬜ 未完成（属 B2） |
+| 真实单控制平面 + Worker 验收 | ✅ 已完成（B2，2026-08-15） |
 
-> B1 交付的是**真实的自动化骨架与执行逻辑**，通过 Ansible 语法校验；尚未在任何真实
-> Ubuntu 24.04 + Kubernetes 1.36.2 集群上运行验收。真实多节点部署、幂等复跑与 reset 属 B2，HA/升级属 B3。
+### B2（当前里程碑：真实环境验收与幂等交付）
+
+| 项目 | 状态 |
+| --- | --- |
+| 真实 Ubuntu 24.04 LTS 双节点 site.yml 全量部署 | ✅ 完成（1 CP 192.168.104.1 + 1 worker 192.168.104.3，Lima） |
+| `verify-cluster.sh` 全量验收（Node Ready / Pod / Calico / DNS） | ✅ 节点 2/2 Ready、Tigerastatus 全 True、DNS OK |
+| 二次重跑幂等（changed=0） | ✅ 达成 |
+| `reset.yml` 拆集群 → `site.yml` 重建 → 再验收再幂等 | ✅ 达成（可重复交付闭环） |
+| 真实环境问题修复（代理 reload / cert-key 提取 / NO_PROXY / 本地清单 / 幂等缺口） | ✅ 全部入库，详见 B2 change record |
+
+> B2 交付的条目在**真实可运行集群**上完成验收，证据与细节见
+> [`docs/changes/2026-08-15-b2-real-cluster-acceptance.md`](./docs/changes/2026-08-15-b2-real-cluster-acceptance.md)。
 
 旧教程中的 Kubernetes、Docker、操作系统和镜像版本均属历史参考，**不得**按旧文档执行；
 执行前必须根据 [`docs/compatibility.md`](./docs/compatibility.md) 复核。
@@ -125,18 +144,18 @@ scripts/
 
 - ✅ `inventory/`、`roles/`、`playbooks/`、`scripts/` 结构与配置已建；
 - ✅ `ansible-playbook --syntax-check`（site/reset/upgrade）与 `ansible-inventory` 门禁通过；
-- ⬜ **真实单控制平面 + Worker 安装验收（Node Ready、CoreDNS、Calico、Service/DNS、Pod 调度）见 B2**；
-- ⬜ 幂等复跑与 reset 可重复见 B2。
+- ✅ **真实单控制平面 + Worker 安装验收（Node Ready、CoreDNS、Calico、Service/DNS、Pod 调度）见 B2（已完成）**；
+- ✅ 幂等复跑与 reset 可重复见 B2（已完成）。
 
 先支持一条可信路径，再扩展系统版本和网络插件，不同时维护多套未验证脚本。
 
-### B2：幂等与验收
+### ~~B2：幂等与验收~~（已完成 2026-08-15）
 
-- Ansible 第二次执行无不必要变更；
-- 节点预检包含 CPU、内存、磁盘、时间同步、Swap、内核模块、端口和网络连通性；
-- 安装后验证 Node Ready、CoreDNS、CNI、Service、DNS 和基础 Pod 调度；
-- 支持 reset / cleanup，不污染下一次演练；
-- 记录每一步耗时、变更摘要、失败原因和最终 cluster handoff 报告。
+- ✅ Ansible 第二次执行无不必要变更（changed=0，实测）；
+- ✅ 节点预检包含 CPU、内存、磁盘、时间同步、Swap、内核模块、端口和网络连通性；
+- ✅ 安装后验证 Node Ready、CoreDNS、CNI、Service、DNS 和基础 Pod 调度（`verify-cluster.sh` 全绿）；
+- ✅ 支持 reset / cleanup，不污染下一次演练（`reset.yml` → `site.yml` 重建闭环验证）；
+- ✅ 记录修复、失败原因与验收证据（[B2 change record](./docs/changes/2026-08-15-b2-real-cluster-acceptance.md)）。
 
 ### B3：HA 与升级证据
 

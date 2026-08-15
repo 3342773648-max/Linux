@@ -10,30 +10,39 @@
     chmod a+r /etc/apt/keyrings/docker.asc
   args:
     creates: /etc/apt/keyrings/docker.asc
-  changed_when: true
 
-- name: 添加 Docker 官方 apt 源（deb822 格式）
+# 只清理 legacy 单行格式 docker-stable.list，避免误删本角色 deb822 生成的
+# docker-stable.sources（否则每次重跑都「删了又建」破坏幂等性）
+- name: 移除旧版 Docker apt 源文件（仅 legacy .list，保留 deb822 .sources）
+  ansible.builtin.file:
+    path: /etc/apt/sources.list.d/docker-stable.list
+    state: absent
+  when: ansible_os_family == "Debian"
+
+- name: 添加 Docker 官方 apt 源（deb822 格式，suite 用发行版代号）
   ansible.builtin.deb822_repository:
     name: docker-stable
     types: [deb]
     uris: "{{ containerd_apt_repo | default('https://download.docker.com/linux/ubuntu') }}"
-    suites: "{{ containerd_apt_suite | default('stable') }}"
+    suites: "{{ containerd_apt_suite | default(ansible_distribution_release | lower) }}"
     components: [stable]
     signed_by: /etc/apt/keyrings/docker.asc
     state: present
+  register: docker_repo_state
 
 - name: 安装 containerd.io（版本锁定：{{ containerd_version }}.*）
   ansible.builtin.apt:
     name: "containerd.io={{ containerd_version }}*"
     state: present
-    update_cache: true
   register: containerd_install
   notify: restart containerd
 
-- name: 生成默认配置（/etc/containerd/config.toml）
+- name: 生成默认配置（仅首次 /etc/containerd/config.toml 缺失时）
   ansible.builtin.shell: |
     set -e
     containerd config default | tee /etc/containerd/config.toml > /dev/null
+  args:
+    creates: /etc/containerd/config.toml
   changed_when: false
 
 - name: 设置 SystemdCgroup = true（containerd 2.x 路径）
@@ -67,3 +76,22 @@
 - name: 记录 containerd 状态
   ansible.builtin.debug:
     msg: "containerd={{ containerd_version_info.stdout }} active={{ containerd_active.stdout }}"
+
+- name: 配置 containerd 通过代理拉取镜像（可选，k8s_containerd_http_proxy 定义时启用）
+  ansible.builtin.file:
+    path: /etc/systemd/system/containerd.service.d
+    state: directory
+    mode: "0755"
+  when: k8s_containerd_http_proxy is defined
+
+- name: 写入 containerd 代理配置（systemd drop-in）
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/containerd.service.d/proxy.conf
+    content: |
+      [Service]
+      Environment="HTTP_PROXY={{ k8s_containerd_http_proxy }}"
+      Environment="HTTPS_PROXY={{ k8s_containerd_http_proxy }}"
+      Environment="NO_PROXY={{ k8s_containerd_no_proxy | default('127.0.0.1,localhost,10.0.0.0/8,192.168.0.0/16') }}"
+    mode: "0644"
+  notify: restart containerd
+  when: k8s_containerd_http_proxy is defined

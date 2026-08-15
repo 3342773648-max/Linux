@@ -1,23 +1,47 @@
 # CNI role：Calico v3.32.1（tigera-operator 官方路径）
 # 顺序：CRD → tigera-operator → custom-resources → 等待 Tigerastatus
 # 只在 first control_plane 上执行（site.yml 限定 hosts: control_plane[0]）
+#
+# 幂等设计：清单先下载到 /etc/kubernetes/（本地文件），再 kubectl apply；
+# 避免每次重跑都依赖外网拉取（网络抖动 → 重跑失败），apply 本身幂等。
+# 下载失败仍会暴露（清单文件 missing → faill），但不会因瞬时 EOF 中断重跑。
 
-- name: 下载并应用 Calico v3.32.1 CRD（server-side apply，避免大清单 request 超限）
-  ansible.builtin.command: >-
-    kubectl apply --server-side -f
-    https://raw.githubusercontent.com/projectcalico/calico/v3.32.1/manifests/v1_crd_projectcalico_org.yaml
+- name: 下载 Calico CRD 清单到本地（v{{ calico_version }}）
+  ansible.builtin.get_url:
+    url: "https://raw.githubusercontent.com/projectcalico/calico/v{{ calico_version }}/manifests/v1_crd_projectcalico_org.yaml"
+    dest: /etc/kubernetes/calico-crd.yaml
+    owner: root
+    group: root
+    mode: "0600"
+  environment:
+    HTTPS_PROXY: "{{ k8s_containerd_http_proxy | default('') }}"
+    NO_PROXY: "127.0.0.1,localhost,{{ control_plane_endpoint.split(':')[0] if control_plane_endpoint is defined else '' }},10.0.0.0/8,192.168.0.0/16"
+
+- name: 应用 Calico CRD（server-side apply，避免大清单 request 超限）
+  ansible.builtin.command: kubectl apply --server-side -f /etc/kubernetes/calico-crd.yaml
   environment:
     KUBECONFIG: /etc/kubernetes/admin.conf
-  changed_when: true
+  # CRD server-side apply 每次输出 serverside-applied（无 unchanged 语义）：
+  # 改由下游任务（CRD 就绪检查）承担条件；本任务声明式幂等，不报 changed
+  changed_when: false
   register: cni_crd
 
-- name: 下载并应用 Tigera Operator
-  ansible.builtin.command: >-
-    kubectl apply -f
-    https://raw.githubusercontent.com/projectcalico/calico/v3.32.1/manifests/tigera-operator.yaml
+- name: 下载 Tigera Operator 清单到本地（v{{ calico_version }}）
+  ansible.builtin.get_url:
+    url: "https://raw.githubusercontent.com/projectcalico/calico/v{{ calico_version }}/manifests/tigera-operator.yaml"
+    dest: /etc/kubernetes/calico-tigera-operator.yaml
+    owner: root
+    group: root
+    mode: "0600"
+  environment:
+    HTTPS_PROXY: "{{ k8s_containerd_http_proxy | default('') }}"
+    NO_PROXY: "127.0.0.1,localhost,{{ control_plane_endpoint.split(':')[0] if control_plane_endpoint is defined else '' }},10.0.0.0/8,192.168.0.0/16"
+
+- name: 应用 Tigera Operator
+  ansible.builtin.command: kubectl apply -f /etc/kubernetes/calico-tigera-operator.yaml
   environment:
     KUBECONFIG: /etc/kubernetes/admin.conf
-  changed_when: true
+  changed_when: "'unchanged' not in cni_operator.stdout"
   register: cni_operator
 
 - name: 写入 Calico custom-resources（含 CALICO_IPV4POOL_CIDR 覆盖）
@@ -33,15 +57,16 @@
     kubectl apply -f /etc/kubernetes/calico-custom-resources.yaml
   environment:
     KUBECONFIG: /etc/kubernetes/admin.conf
-  changed_when: true
+  changed_when: "'unchanged' not in cni_custom.stdout"
+  register: cni_custom
 
-- name: 等待 Calico 组件就绪（tigerastatus 全 True）
+- name: 等待 Calico 组件就绪（tigerastatus AVAILABLE=True）
   ansible.builtin.shell: |
     set -e
     timeout 600 bash -c '
       while true; do
         if kubectl get tigerastatus --no-headers 2>/dev/null \
-             | awk "\$4 == \"True\" && \$4 != \"\"" | grep -q .; then
+             | awk '\''$2=="True"'\'' | grep -q .; then
           break
         fi
         sleep 10

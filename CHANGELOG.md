@@ -64,6 +64,23 @@
 - **README**：`当前状态` 增加 B1 结构就绪声明；`重建路线` B1 标记「结构已就绪，真实验收属 B2」。
 - **CHANGELOG / change record**：新增 B1 变更记录。
 
+### Added
+
+- **B2 真实环境验收与幂等交付**（2026-08-15，见 `docs/changes/2026-08-15-b2-real-cluster-acceptance.md`）：
+  - 在真实 Ubuntu 24.04 LTS 双节点（Lima arm64，1 CP + 1 worker）完成 `site.yml` 全量部署；
+  - `verify-cluster.sh` 全量验收通过（Node Ready / Pod / Calico Tigerastatus / CoreDNS / DNS 解析）；
+  - 二次重跑幂等（changed=0）；`reset.yml` → 重建 → 再验收再幂等闭环验证；
+  - containerd handler 增加 `daemon_reload`（代理 drop-in 生效）；certificate-key 提取改用
+    `stdout_lines | select(match)` 鲁棒解析；CNI 任务补 `NO_PROXY` 并改本地 get_url 清单；
+    deb822/legacy 源清理不再误删 `docker-stable.sources`；`config.toml`/GPG 用 `creates` 幂等；
+    `verify-cluster.sh` 修正 tigerastatus 列号与 busybox 全限定 DNS 名。
+
+### Changed
+
+- **README**：`当前状态` 增加 B2 完成声明；B1 路线的真实验收项标记为 B2 完成，
+  新增「B2（当前里程碑）」验收清单；B2 路线标记为已完成。
+- **CHANGELOG / change record**：新增 B2 变更记录；`site.yml` 汇总提示指向 B2 change record。
+
 ### Security
 
 - 明确 join 凭据（Token / certificate-key / CA 哈希）现场生成、短时有效、安全通道传输；

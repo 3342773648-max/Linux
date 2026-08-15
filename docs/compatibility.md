@@ -15,26 +15,34 @@
 
 | 状态 | 含义 |
 | --- | --- |
-| 已确认（官方兼容，未实机验证） | 经官方来源核实、版本组合一致，作为 B1 自动化实现的**首个验收目标**；真实多节点验收属 B1 |
+| 已确认（官方兼容，未实机验证） | 经官方来源核实、版本组合一致，作为首个验收目标；真实多节点验收属 B1/B2 |
+| 已实机验证（B2，arm64 实验室） | 在本项目实验环境（Lima arm64，Ubuntu 24.04）完成安装、运行与验收（见 `docs/changes/2026-08-15-b2-real-cluster-acceptance.md`）；x86_64 宿主仍需单独回归（见下注） |
 | 计划验证 | 已列入后续里程碑，尚未在本项目实验环境完成安装与验收 |
 | 历史参考 | 仅存在于历史教程的学习材料，不用于当前重建路线 |
 | 不支持 | 明确排除在支持范围之外 |
 
 > 「官方兼容」指 containerd 官方 Kubernetes 兼容矩阵、Kubernetes 官方版本策略等上游文档的
-> 组合声明；「项目选定」指本仓库承诺支持的范围；「实机验证」只能在 B1+ 的实验环境中完成。
+> 组合声明；「项目选定」指本仓库承诺支持的范围；「实机验证」依托 B2 实验环境完成。
+> 注：B2 实验室运行于 **arm64（aarch64）**；x86_64 为 B0 声明的首条路径，二者镜像/内核差异
+> 已由角色内 `k8s_accepted_arches` 断言 + B0 change record 说明，属于待办回归项。
 
 ## 第一条支持路径（已确认）
 
 | 组件 | 版本 | 状态 | 官方来源 |
 | --- | --- | --- | --- |
-| Linux 发行版 | Ubuntu 24.04 LTS（Noble，x86_64） | 已确认（官方兼容，未实机验证） | kubeadm 安装文档（Debian 系；要求 glibc） |
-| Kubernetes | 1.36；B1 首次验收锚点固定 **1.36.2**（2026-06-09 发布，EOL 2027-06-28）。锚点 ≠ 当前最新 patch，1.36.x 后续 patch 需回归验证后更新 | 已确认（官方兼容，未实机验证） | kubernetes.io/releases |
-| kubeadm / kubelet / kubectl | 1.36.2（锚点）同位对齐 | 已确认（官方兼容，未实机验证） | install-kubeadm、version-skew-policy |
-| 容器运行时 | containerd **2.3.x LTS**（锚点：实际安装的 2.3 系 deb 包；EOL 2028-04-30） | 已确认（官方兼容，未实机验证） | containerd.io/releases 官方兼容矩阵（K8s 1.36 → 2.3.0+/2.2.0+） |
-| cgroup 驱动 | systemd（kubelet 与 containerd 双向一致），cgroup v2 | 已确认（官方兼容，未实机验证） | container-runtimes |
-| CNI | Calico **v3.32.1**（2026-06-26 发布） | 已确认（官方兼容，未实机验证） | projectcalico/calico releases |
-| Ansible Core | **2.21.x**；B1 首次验收锚点 2.21.3（查询日最新，2026-08-10；EOL 2027-11）；后续 2.21.x patch 更新须回归 | 已确认（官方兼容，未实机验证） | docs.ansible.com release_and_maintenance |
-| 控制平面拓扑 | 单控制平面 + N Worker | 已确认（官方兼容，未实机验证） | 见[控制平面与 HA](#控制平面与-ha) |
+| Linux 发行版 | Ubuntu 24.04 LTS（Noble，arm64 实机验证） | 已实机验证（B2，arm64） | kubeadm 安装文档（Debian 系；要求 glibc）；B2 change record |
+| Kubernetes | 1.36；B1/B2 验收锚点固定 **1.36.2**（2026-06-09 发布，EOL 2027-06-28）。锚点 ≠ 当前最新 patch，1.36.x 后续 patch 需回归验证后更新 | 已实机验证（B2） | kubernetes.io/releases |
+| kubeadm / kubelet / kubectl | 1.36.2（锚点）同位对齐 | 已实机验证（B2） | install-kubeadm、version-skew-policy |
+| 容器运行时 | containerd **2.3.x LTS**（锚点：实际安装的 2.3.3，EOL 2028-04-30） | 已实机验证（B2） | containerd.io/releases 官方兼容矩阵（K8s 1.36 → 2.3.0+/2.2.0+） |
+| cgroup 驱动 | systemd（kubelet 与 containerd 双向一致），cgroup v2 | 已实机验证（B2） | container-runtimes |
+| CNI | Calico **v3.32.1**（2026-06-26 发布） | 已实机验证（B2，Tigerastatus 全 True） | projectcalico/calico releases |
+| Ansible Core | **2.21.x**；验收锚点 2.21.3（查询日 2026-08-10；EOL 2027-11）；后续 2.21.x patch 更新须回归 | 已实机验证（B2） | docs.ansible.com release_and_maintenance |
+| 控制平面拓扑 | 单控制平面 + N Worker（B2：1 CP + 1 worker） | 已实机验证（B2） | 见[控制平面与 HA](#控制平面与-ha) |
+
+> B2 状态说明：上述加粗组合已在仓库实验环境完成 `site.yml` → `verify-cluster.sh` → 幂等复跑
+> → `reset.yml` → 重建验收全闭环（2026-08-15）。「arm64 已实机验证」不自动覆盖 x86_64；
+> x86_64 回归属于后续待办（B0 change record 已注明，角色内 `k8s_accepted_arches` 断言会阻止
+> 在未登记架构上静默安装）。
 
 选择理由：Ubuntu 24.04 是 kubeadm 官方安装文档覆盖的 Debian 系发行版，也是 containerd
 官方自动化测试的首选平台；查询日三个受支持 minor（1.36/1.35/1.34）中 1.36 的 EOL 最晚
