@@ -86,6 +86,21 @@
     预置的 CRI-disabled `/etc/containerd/config.toml`（此前 `creates` 守卫生效导致跳过生成）。
   - 解锁 B3（HA / 多控制平面 / etcd quorum / 升级演练）。
 
+### Added
+
+- `SECURITY.md`：开源安全门面——Supported Versions、漏洞上报（GitHub Advisory + 加密邮箱）与
+  披露时间线、凭据处理约束（SSH/kubeconfig/join 材料不得入库）、供应链控制（apt/pkgs.k8s.io
+  签名校验、Calico 固定版本、禁 `curl | sh`）、CI 控制、双架构（arm64/x86_64）验收边界声明、
+  威胁模型与贡献安全检查清单；内容参照 aiops-platform 结构，针对 kubeadm/containerd 交付场景
+  独立改写。
+- `CONTRIBUTING.md`：开源贡献门面——前置条件（ansible-core、双架构 lab）、入门步骤含本地门禁
+  命令（markdown style/scan/ansible syntax/inventory graph）、代码约定（幂等、版本固定、架构
+  支持、凭据纪律）、PR 工作流、Issue 报告规范、安全披露入口。
+
+### Changed
+
+- `README.md` 文档入口表新增 SECURITY.md 与 CONTRIBUTING.md 链接。
+
 ### Changed
 
 - **README**：B2 小节补充 x86_64 回归完成声明（含 change record 链接）。

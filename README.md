@@ -75,6 +75,8 @@ B2「真实环境验收与幂等交付」**已完成**（2026-08-15，见 [`docs
 | [兼容矩阵](./docs/compatibility.md) | B0：第一条支持路径、版本关系、HA 与升级状态（**当前文档**） |
 | [实验环境合同](./docs/lab-environment.md) | B0：拓扑、网络/镜像前提、销毁与脱敏规则（**当前文档**） |
 | [安全基线](./docs/security-boundaries.md) | B0：禁止项、凭据生命周期、端口/SSH 与 .gitignore 规则（**当前文档**） |
+| [SECURITY.md](./SECURITY.md) | 开源门面：Supported Versions / 漏洞上报 / 凭据与供应链控制 / 双架构验收边界 |
+| [CONTRIBUTING.md](./CONTRIBUTING.md) | 开源门面：贡献前置、门禁、代码约定、PR 工作流 |
 | [kubeadm 单节点部署](./使用kubeadm快速部署一个K8s集群.md) | 历史教程：学习与测试环境的手动部署复盘 |
 | [kubeadm 高可用部署](./使用kubeadm搭建高可用的K8s集群.md) | 历史教程：HA 拓扑和组件配置复盘 |
 | [Ansible 自动化部署](./Ansible自动化部署K8S集群.md) | 历史教程：Ansible 概念、Inventory 和 Playbook 学习参考 |
