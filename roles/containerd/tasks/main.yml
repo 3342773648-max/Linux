@@ -30,6 +30,13 @@
     state: present
   register: docker_repo_state
 
+# 仅当源文件实际变化时刷新 apt 缓存（新节点首次部署依赖它才能找到 containerd.io；
+# 重跑时源未变化 → 不触发 update，保持幂等 changed=0）
+- name: 刷新 apt 缓存（仓库源变化后，首次部署必需）
+  ansible.builtin.apt:
+    update_cache: true
+  when: docker_repo_state.changed
+
 - name: 安装 containerd.io（版本锁定：{{ containerd_version }}.*）
   ansible.builtin.apt:
     name: "containerd.io={{ containerd_version }}*"
@@ -37,10 +44,26 @@
   register: containerd_install
   notify: restart containerd
 
+# 检测镜像预置的 CRI-disabled 配置（Ubuntu cloud image 自带 /etc/containerd/config.toml，
+# 内含 disabled_plugins = ["cri"]）。x86_64 回归暴露：此文件存在会让下面的
+# `creates` 直接跳过生成，导致 containerd 以禁用 CRI 的配置启动、kubeadm 连不上运行时。
+- name: 检查是否镜像预置 CRI-disabled 配置
+  ansible.builtin.shell: grep -q '^disabled_plugins.*cri' /etc/containerd/config.toml 2>/dev/null && echo disabled || echo ok
+  register: containerd_config_mode
+  changed_when: false
+  failed_when: false
+
+- name: 移除镜像预置 CRI-disabled 配置（保留 containerd 后续生成的正确默认）
+  ansible.builtin.file:
+    path: /etc/containerd/config.toml
+    state: absent
+  when: containerd_config_mode.stdout == "disabled"
+  notify: restart containerd
+
 - name: 生成默认配置（仅首次 /etc/containerd/config.toml 缺失时）
   ansible.builtin.shell: |
     set -e
-    containerd config default | tee /etc/containerd/config.toml > /dev/null
+    containerd config default > /etc/containerd/config.toml
   args:
     creates: /etc/containerd/config.toml
   changed_when: false

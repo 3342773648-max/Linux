@@ -62,6 +62,11 @@ B2「真实环境验收与幂等交付」**已完成**（2026-08-15，见 [`docs
   CNI 本地清单化、多处幂等缺口、reset 后重建目录补齐。
 
 > 部署输出即真实集群可运行；验收证据、修复记录与 host_vars 连接说明见 B2 change record。
+>
+> **B2 x86_64 回归已完成**（同日，见 [`docs/changes/2026-08-15-b2-x8664-regression.md`](./docs/changes/2026-08-15-b2-x8664-regression.md)）：
+> B0 声明的首条路径 x86_64 在 QEMU 模拟 Ubuntu 24.04 amd64 双节点重放同矩阵
+> （首次部署 → verify 全绿 → 二次幂等 changed=0 → reset → 重建 → 再 verify → 再幂等），
+> 并修复两个 x86_64 特有预置问题（apt 缓存未刷新、cloud image 预置 CRI-disabled 的 containerd 配置）。
 
 ## 文档入口
 

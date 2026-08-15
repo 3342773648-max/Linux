@@ -1,0 +1,17 @@
+# B2 x86_64 回归 Inventory（RFC 5737 文档地址；真实连接在 host_vars/*/local.yml，gitignored）
+# ⚠️ 仅用于本地实验，不得用于真实生产环境。
+# 独立文件：避免与 hosts.yml（arm64 验证拓扑）同时命中 all 组。
+
+all:
+  children:
+    k8s_cluster:
+      children:
+        control_plane:
+          hosts:
+            cp-x86:
+        worker:
+          hosts:
+            worker-x86:
+    etcd:                       # stacked etcd（继承 control_plane）
+      children:
+        control_plane:

@@ -75,6 +75,23 @@
     deb822/legacy 源清理不再误删 `docker-stable.sources`；`config.toml`/GPG 用 `creates` 幂等；
     `verify-cluster.sh` 修正 tigerastatus 列号与 busybox 全限定 DNS 名。
 
+### Added
+
+- **B2 x86_64 回归验收**（2026-08-15，见 `docs/changes/2026-08-15-b2-x8664-regression.md`）：
+  - 在 Ubuntu 24.04 amd64 双节点（QEMU 模拟 x86_64，1 CP + 1 worker）重放 B2 全矩阵：
+    首次 `site.yml` → `verify-cluster.sh` 全绿 → 二次幂等 changed=0 → `reset.yml` →
+    重建 → 再 verify → 再幂等 changed=0，全部通过；
+  - 修复 x86_64 暴露的两个预置问题：`deb822_repository` 后补条件 apt 缓存刷新
+    （`when: docker_repo_state.changed`，保持幂等）；检测并移除 Ubuntu amd64 cloud image
+    预置的 CRI-disabled `/etc/containerd/config.toml`（此前 `creates` 守卫生效导致跳过生成）。
+  - 解锁 B3（HA / 多控制平面 / etcd quorum / 升级演练）。
+
+### Changed
+
+- **README**：B2 小节补充 x86_64 回归完成声明（含 change record 链接）。
+- **inventory**：新增 `hosts-x86.yml`（RFC 5737 示例）与 `host_vars/cp-x86.yml`、
+  `host_vars/worker-x86.yml` 示例；真实连接仍在 gitignored `host_vars/*/local.yml`（目录形式）。
+
 ### Changed
 
 - **README**：`当前状态` 增加 B2 完成声明；B1 路线的真实验收项标记为 B2 完成，
