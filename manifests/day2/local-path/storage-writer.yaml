@@ -1,0 +1,35 @@
+# Day2 验收：local-path StorageClass 动态供给 + PVC 持久化验证
+# 场景：PVC 动态供给 → Pod A 写入文件 → 删除 Pod A → Pod B 挂载同一 PVC → 验证数据仍在
+# 说明：local-path 数据存于节点本地目录（单节点场景即持久化闭环验证）
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: day2-pvc
+  namespace: default
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: local-path
+  resources:
+    requests:
+      storage: 1Gi
+---
+# Pod A：写入持久化数据后自我标记完成
+apiVersion: v1
+kind: Pod
+metadata:
+  name: day2-writer
+  namespace: default
+spec:
+  restartPolicy: Never
+  containers:
+    - name: writer
+      image: busybox:1.36
+      command: ["/bin/sh", "-c", "echo 'day2-storage-persisted' > /mnt/data/persist.txt && echo WROTE && ls -la /mnt/data/"]
+      volumeMounts:
+        - name: data
+          mountPath: /mnt/data
+  volumes:
+    - name: data
+      persistentVolumeClaim:
+        claimName: day2-pvc
