@@ -89,7 +89,23 @@ iptables -D OUTPUT -p tcp --dport 443 -j DROP
 ## 5. 已知限制（如实标注）
 
 - **node-exporter `v1.12.1-distroless`**：上游 quay 该 tag 的 arm64 manifest 引用了 registry 端缺失的层（2026-08-16 实测），`ctr export`/`registry-load` 均无法处理；离线侧需从近源镜像站拉取完整 variant 或选用其他镜像。**已记入 images-list.txt 注释**，属上游问题、不影响集群运行。
-- **`ctr` CLI 不走 CRI mirrors**：`ctr i pull` 仍直连公网（certs.d 是 CRI 配置，仅 kubelet/kubeadm 使用）。离线验收以 kubelet 拉取为准（已实测通过）。
-- **单架构**：镜像按 arm64 载入/导出；x86_64 离线链未重放（离线链与架构无关，B2 已覆盖 x86_64 在线交付）。
+- **`ctr` CLI 不走 CRI mirrors**：`ctr i pull` 仍直连公网（certs.d 是 CRI 配置，仅 kubelet/kubeadm 使用）。离线验收以 kubelet 拉取为准（已实测通过）；如确需 ctr 走 mirrors，加 `--hosts-dir /etc/containerd/certs.d`。
+- **mirror fallback（fail-open 语义）**：hosts.toml 的 `server` 指向原上游、`[host."http://内网"]` 为 mirror——containerd 语义为 mirror 优先、upstream fallback。本验收的 fail-closed 条件为「公网不可达」，此场景下无 fallback 路径（已实测负向：registry down + 443 DROP → pull 失败）。若需「公网可达也不 fallback」的严格 authoritative 模式，需将 `server` 改为内网地址——属多节点生产阶段演进项（见 `docs/changes/2026-08-16-p1-review-feedback.md`）。
+- **skip_verify=true（lab-only）**：当前 registry 为明文 HTTP（127.0.0.1:5000），无 TLS 可验证。生产部署应改用 TLS + CA（`skip_verify = false`）或网络隔离。
+- **registry 2.8.3 安全债务**：distribution 2.8.3 存在已知安全公告（GHSA-6pjf-3r9x-m592 等），仅用于本 lab 验收（单节点、内网、匿名）；**不作为生产 registry 基线**，上线前需评估升级。
+- **单架构**：镜像按 arm64 **单平台**载入/导出（原多平台 index 的 arm64 单架构重发布，非原 index 原样镜像）；x86_64 离线链未重放（离线链与架构无关，B2 已覆盖 x86_64 在线交付）。
 - **模拟断网**：iptables 阻断出站 443（非真断物理链路），精确模拟「无公网、有内网」。
-- **registry 单机**：127.0.0.1 单点；多节点离线环境应把 REG 改为内网可达地址（`[host."http://内网IP:5000"]`）。
+- **registry 单机**：127.0.0.1 为 per-node local registry；多节点离线环境应部署 shared internal registry（内网 IP/DNS + TLS/认证），所有节点 hosts.toml 指向同一地址。
+- **镜像验收粒度**：verify-offline.sh 为「repo 级匹配 + digest 容忍」的轻量 preflight；完整 manifest digest + platform + CRI pull 校验（offline-image-lock）属 P2 演进项。
+
+## 6. 未来演进（AgentChat Step 5 审查建议）
+
+1. **P1**：x86_64 重放（证明方案非 arm64 特例）
+2. **P1**：多节点并发 + 重启场景验证
+3. **P1**：registry TLS + 认证（admin/node profile 拆分：node 只给 pull+resolve）
+4. **P2**：offline-image-lock.json（统一 source of truth + digest/platform 校验）
+5. **P2**：镜像签名/供应链验证（cosign/SBOM/provenance + tar sha256sum）
+6. **P3**：multi-arch index 支持 + OCI artifact 全面兼容
+7. **P3**：registry GC/存储生命周期 + blob 并发上传优化
+
+审查反馈全文见 `docs/changes/2026-08-16-p1-review-feedback.md`。
