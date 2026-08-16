@@ -78,6 +78,17 @@ Day2「交付 + 可运维」套件**已完成**（2026-08-16，见 [`docs/change
 > Day2 套件是交付内容的扩展（不新增平台能力），交付链延伸为：
 > 预检 → 部署 → CNI →（HA）→ **Ingress → 存储 → 监控**。
 
+P1「离线交付链」**已完成**（2026-08-16，见 [`docs/changes/2026-08-16-p1-offline-delivery-acceptance.md`](./docs/changes/2026-08-16-p1-offline-delivery-acceptance.md)）：
+
+- **镜像 tar 工具链**（`scripts/offline/`）：export-images / import-images，27 个固定版本镜像（控制面 + Calico + Day2 全套）在线导出、离线导入；
+- **local registry + containerd mirrors**：registry 2.8.3 二进制 + systemd，cri `config_path` 指向 certs.d，hosts.toml 将 registry.k8s.io/quay.io/docker.io/rancher 镜像源指向内网（**修复了 config_path 未设置导致 mirrors 不生效的关键缺陷**）；
+- **Day2 镜像源切换**：mirror-day2.sh 批量载入套件镜像，kubelet 无需改 manifest 即命中内网；
+- **模拟断网真实验收**：iptables 阻断出站 443（保留内网 registry）→ `verify-offline.sh` 全绿 → 断网下 kubelet 从 local registry 拉取 busybox 并 Running → ingress 200 / kubectl top 正常；
+- 边界如实：模拟断网（非真断物理链路）、单架构（arm64）、node-exporter 上游 manifest 悬空层缺陷已标注。
+- 手册见 [`docs/offline-delivery.md`](./docs/offline-delivery.md)。
+
+> 离线交付链延伸交付场景：预检 → 部署 → CNI →（HA）→ Ingress → 存储 → 监控 → **离线交付**。
+
 ## 文档入口
 
 | 文档 | 当前用途 |
@@ -90,6 +101,8 @@ Day2「交付 + 可运维」套件**已完成**（2026-08-16，见 [`docs/change
 | [Day2 Ingress 验收](./docs/changes/2026-08-16-day2-ingress-nginx-acceptance.md) | Day2：ingress-nginx v1.12.1 部署与 HTTP 路由验收 |
 | [Day2 存储验收](./docs/changes/2026-08-16-day2-local-path-acceptance.md) | Day2：local-path 动态供给 + PVC 持久化闭环验收 |
 | [Day2 监控验收](./docs/changes/2026-08-16-day2-monitoring-acceptance.md) | Day2：metrics-server + kube-prometheus-stack 指标验收 |
+| [P1 离线交付验收](./docs/changes/2026-08-16-p1-offline-delivery-acceptance.md) | P1：离线交付链（镜像 tar + local registry + 模拟断网）真实验收 |
+| [离线交付手册](./docs/offline-delivery.md) | P1：离线/受限网络场景交付执行手册 |
 | [kubeadm 单节点部署](./使用kubeadm快速部署一个K8s集群.md) | 历史教程：学习与测试环境的手动部署复盘 |
 | [kubeadm 高可用部署](./使用kubeadm搭建高可用的K8s集群.md) | 历史教程：HA 拓扑和组件配置复盘 |
 | [Ansible 自动化部署](./Ansible自动化部署K8S集群.md) | 历史教程：Ansible 概念、Inventory 和 Playbook 学习参考 |
@@ -185,6 +198,15 @@ scripts/
 - ✅ **存储**：local-path-provisioner v0.0.31，StorageClass 动态供给 + PVC 写入 → Pod 删除 → 同 PVC 读回 → Delete 回收闭环；
 - ✅ **监控**：metrics-server v0.9.0（`kubectl top` node/pod 真实指标）+ kube-prometheus-stack chart 88.3.0（Prometheus targets 10 up、Grafana 13.1.3 health OK）；
 - ⚠️ 如实标注：alertmanager 关闭（单节点无告警分发）；4 个控制面 metrics target 默认 down（kubeadm 未暴露端点）；Grafana 密码入 gitignored 本地 values。
+
+### P1（离线交付链，已完成 2026-08-16）
+
+受限/无外网场景交付能力，脚本落 `scripts/offline/`、手册落 `docs/offline-delivery.md`、验收落 `docs/changes/2026-08-16-p1-offline-delivery-acceptance.md`：
+
+- ✅ **镜像 tar 工具链**：export-images（在线导出 27 个固定版本镜像）/ import-images（离线导入），digest 容忍 + SIGPIPE 修复；
+- ✅ **local registry + containerd mirrors**：registry 2.8.3 二进制 + systemd + cri `config_path` → certs.d + hosts.toml（registry.k8s.io/quay.io/docker.io/rancher → 内网）；**修复 config_path 未设置导致 mirrors 不生效**；
+- ✅ **Day2 镜像源切换**：mirror-day2.sh 批量载入 11/12 套件镜像（node-exporter 上游缺陷如实标注），kubelet 免改 manifest 命中内网；
+- ✅ **模拟断网验收**：iptables 443 DROP（保留内网）→ verify-offline 全绿 → 断网下 kubelet 从 local registry 拉取镜像 pod Running → ingress 200 / kubectl top 正常。
 
 ### B3：HA 与升级证据
 

@@ -118,6 +118,29 @@
   - `inventory/hosts-day2.yml`：Day2 单节点（arm64）验收 inventory（RFC 5737 文档风格）；
   - 交付链延伸：预检 → 部署 → CNI →（HA）→ **Ingress / 存储 / 监控**。
 
+- **P1 离线交付链**（2026-08-16，见 `docs/changes/2026-08-16-p1-offline-delivery-acceptance.md`、
+  `docs/offline-delivery.md`）：
+  - `scripts/offline/images-list.txt`：27 个固定版本镜像清单（kubeadm 1.36.2 控制面 + Calico 3.32.1
+    全套 + ingress-nginx 1.12.1 + local-path 0.0.31 + kube-prometheus-stack 88.3.0 + metrics-server
+    0.9.0，按实际运行版本固定，非 kubeadm 默认 1.36.3）；
+  - `scripts/offline/export-images.sh` / `import-images.sh`：镜像单 tar 批量导出（digest 容忍、
+    3 次重试、跳过列表）/ 导入（对齐清单校验）；在线侧导出、离线侧导入完成介质传递；
+  - `scripts/offline/setup-local-registry.sh`：registry **2.8.3 二进制** + systemd 服务（无 docker
+    环境可用）+ cri `config_path` → `/etc/containerd/certs.d`（**关键修复**：初版漏设 config_path，
+    hosts.toml 从未被 CRI 读取）+ hosts.toml mirrors（registry.k8s.io/quay.io/docker.io/rancher
+    → 内网 registry）；
+  - `scripts/offline/registry-load.sh`：本地镜像经 registry HTTP API 载入内网 registry（arm64
+    单平台、保原 tag、blob HEAD 幂等；规避 `ctr i push` 对多平台 OCI index 的 "blob unknown"
+    缺陷）；修复 SIGPIPE（awk 提前 exit）与 repo 路径映射；
+  - `scripts/offline/mirror-day2.sh`：Day2 套件镜像批量载入（11/12，node-exporter 上游 manifest
+    悬空层缺陷如实标注）；containerd mirrors 使 kubelet 免改 manifest 命中内网（镜像源切换）；
+  - `scripts/offline/verify-offline.sh`：离线 preflight（443 阻断检测 + registry 可达 + 镜像齐备
+    + kubeadm 工具链），断网状态下全绿；
+  - **模拟断网真实验收**：iptables 阻断出站 443（保留内网 registry）→ 无代理公网连接失败、
+    内网 registry 可达 → 断网下删除本地 busybox 引用后新建 pod（kubelet 经 mirrors 从内网
+    registry 拉取）**1/1 Running**（日志 OFFLINE_PULL_OK）→ ingress 200 / kubectl top 正常；
+  - 交付链延伸：预检 → 部署 → CNI →（HA）→ Ingress / 存储 / 监控 → **离线交付**。
+
 ### Changed
 
 - **README**：B2 小节补充 x86_64 回归完成声明（含 change record 链接）。
