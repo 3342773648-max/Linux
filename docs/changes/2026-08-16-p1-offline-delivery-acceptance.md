@@ -96,6 +96,24 @@ day2-cp   249m   6%   4109Mi   52%
 
 - ✅ ingress 路由 / metrics 在断网下正常
 
+### 8. 负向验收（fail-closed，防公网 fallback 假阳性）
+
+审查提示「只验证拉取成功 ≠ 证明不会偷偷 fallback 公网」后补充：
+
+```
+# 断网（443 DROP）+ 停 local registry + 删本地镜像 → 新建 pod 拉取
+$ systemctl stop local-registry
+$ kubectl get pod neg-test-... → 0/1 ErrImagePull    (registry 不可达 → 拉取失败)
+
+# 重启 local registry（断网仍在）→ 同 deployment 重试
+$ systemctl start local-registry
+$ kubectl get pod neg-test-... → 1/1 Running        (registry 恢复 → 拉取成功)
+```
+
+- ✅ **registry down + 公网不可达 → pull FAIL**（不会 fallback 互联网）
+- ✅ registry up + 公网不可达 → pull SUCCESS
+- 正/负双证证明 mirrors 行为是 **fail-closed**（离线语义正确）
+
 ## 关键修复记录（P1 实测暴露）
 
 1. **containerd cri `config_path` 未设置**（setup-local-registry.sh 初版漏配）→ hosts.toml 从未被 CRI 读取、kubelet 继续直连公网。修复：脚本幂等写入 `/etc/containerd/certs.d`（仅 cri 段，避免误伤 nri/transfer 段）。**此修复是 P1 能否生效的关键。**
