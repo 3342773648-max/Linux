@@ -1,0 +1,25 @@
+# Day2 监控验收：kube-prometheus-stack 单节点轻量定制
+# 理由：单节点环境；完整保留 prometheus/grafana/node-exporter/kube-state-metrics，
+# 关闭 alertmanager（单节点无告警分发需求，如实标注降级项）
+alertmanager:
+  enabled: false
+prometheus:
+  prometheusSpec:
+    replicas: 1
+    resources:
+      requests:
+        cpu: 200m
+        memory: 512Mi
+      limits:
+        memory: 1Gi
+grafana:
+  enabled: true
+  # 演示环境注：admin 密码不入库，部署时用 gitignored 本地 values 覆盖（见 docs/changes day2 记录）
+  adminPassword: "CHANGE_ME_in_local_values"
+  service:
+    type: NodePort
+    nodePort: 30300
+prometheus-node-exporter:
+  enabled: true
+kube-state-metrics:
+  enabled: true
