@@ -101,6 +101,23 @@
 
 - `README.md` 文档入口表新增 SECURITY.md 与 CONTRIBUTING.md 链接。
 
+### Added
+
+- **Day2 可运维套件**（2026-08-16，见 `docs/changes/2026-08-16-day2-{ingress-nginx,local-path,monitoring}-acceptance.md`）：
+  - `manifests/day2/ingress-nginx/`：ingress-nginx **v1.12.1** 官方 baremetal 清单 + echo 验收应用
+    （`deploy-v1.12.1.yaml` / `echo-app.yaml`）；在 `bootstrap-day2`（arm64 vz 单节点）真实部署，
+    `curl` 经 NodePort 验证 HTTP 200 + 后端内容、错误 Host 404，Ingress ADDRESS 自动回填；
+  - `manifests/day2/local-path/`：local-path-provisioner **v0.0.31** 官方清单 + writer/reader 验收
+    Pod（`deploy-v0.0.31.yaml` / `storage-{writer,reader}.yaml`）；StorageClass 动态供给 → PVC Bound
+    → 写入 → Pod 删除 → 同 PVC 读回 → Delete 回收，完整生命周期真实验证；
+  - `manifests/day2/monitoring/`：metrics-server **v0.9.0**（`metrics-server-components-v0.9.0.yaml`，
+    含 `--kubelet-insecure-tls` lab 适配）+ kube-prometheus-stack **chart 88.3.0**
+    （`kube-prometheus-values.yaml`：单副本、关 alertmanager、Grafana NodePort）；`kubectl top`
+    真实指标、Prometheus targets 10 up、`node_exporter_build_info`/`kube_node_info` 可查、Grafana
+    13.1.3 `/api/health` OK；
+  - `inventory/hosts-day2.yml`：Day2 单节点（arm64）验收 inventory（RFC 5737 文档风格）；
+  - 交付链延伸：预检 → 部署 → CNI →（HA）→ **Ingress / 存储 / 监控**。
+
 ### Changed
 
 - **README**：B2 小节补充 x86_64 回归完成声明（含 change record 链接）。

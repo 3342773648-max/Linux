@@ -68,6 +68,16 @@ B2「真实环境验收与幂等交付」**已完成**（2026-08-15，见 [`docs
 > （首次部署 → verify 全绿 → 二次幂等 changed=0 → reset → 重建 → 再 verify → 再幂等），
 > 并修复两个 x86_64 特有预置问题（apt 缓存未刷新、cloud image 预置 CRI-disabled 的 containerd 配置）。
 
+Day2「交付 + 可运维」套件**已完成**（2026-08-16，见 [`docs/changes/2026-08-16-day2-ingress-nginx-acceptance.md`](./docs/changes/2026-08-16-day2-ingress-nginx-acceptance.md) 等）：
+
+- **Ingress**：ingress-nginx v1.12.1，HTTP 流量入口真实可用（200 + 后端内容、404 精确匹配）；
+- **存储**：local-path-provisioner v0.0.31，StorageClass 动态供给 + PVC 持久化闭环（写入 → Pod 删除 → 读回）真实验证；
+- **监控**：metrics-server v0.9.0（`kubectl top` 真实指标）+ kube-prometheus-stack（Prometheus/Grafana/kube-state-metrics/node-exporter），目标 UP + 指标可查 + Grafana 可达；
+- 全部在 `bootstrap-day2`（Lima arm64 vz 单节点，kubeadm 1.36.2 + Calico v3.32.1）真实验收，manifest 落 `manifests/day2/`，验收证据落 `docs/changes/`。
+
+> Day2 套件是交付内容的扩展（不新增平台能力），交付链延伸为：
+> 预检 → 部署 → CNI →（HA）→ **Ingress → 存储 → 监控**。
+
 ## 文档入口
 
 | 文档 | 当前用途 |
@@ -77,6 +87,9 @@ B2「真实环境验收与幂等交付」**已完成**（2026-08-15，见 [`docs
 | [安全基线](./docs/security-boundaries.md) | B0：禁止项、凭据生命周期、端口/SSH 与 .gitignore 规则（**当前文档**） |
 | [SECURITY.md](./SECURITY.md) | 开源门面：Supported Versions / 漏洞上报 / 凭据与供应链控制 / 双架构验收边界 |
 | [CONTRIBUTING.md](./CONTRIBUTING.md) | 开源门面：贡献前置、门禁、代码约定、PR 工作流 |
+| [Day2 Ingress 验收](./docs/changes/2026-08-16-day2-ingress-nginx-acceptance.md) | Day2：ingress-nginx v1.12.1 部署与 HTTP 路由验收 |
+| [Day2 存储验收](./docs/changes/2026-08-16-day2-local-path-acceptance.md) | Day2：local-path 动态供给 + PVC 持久化闭环验收 |
+| [Day2 监控验收](./docs/changes/2026-08-16-day2-monitoring-acceptance.md) | Day2：metrics-server + kube-prometheus-stack 指标验收 |
 | [kubeadm 单节点部署](./使用kubeadm快速部署一个K8s集群.md) | 历史教程：学习与测试环境的手动部署复盘 |
 | [kubeadm 高可用部署](./使用kubeadm搭建高可用的K8s集群.md) | 历史教程：HA 拓扑和组件配置复盘 |
 | [Ansible 自动化部署](./Ansible自动化部署K8S集群.md) | 历史教程：Ansible 概念、Inventory 和 Playbook 学习参考 |
@@ -163,6 +176,15 @@ scripts/
 - ✅ 安装后验证 Node Ready、CoreDNS、CNI、Service、DNS 和基础 Pod 调度（`verify-cluster.sh` 全绿）；
 - ✅ 支持 reset / cleanup，不污染下一次演练（`reset.yml` → `site.yml` 重建闭环验证）；
 - ✅ 记录修复、失败原因与验收证据（[B2 change record](./docs/changes/2026-08-15-b2-real-cluster-acceptance.md)）。
+
+### D（Day2 可运维套件，已完成 2026-08-16）
+
+交付内容扩展：集群就绪后的 Day2 运维入口，全部清单落 `manifests/day2/`、验收证据落 `docs/changes/`，在 `bootstrap-day2`（arm64 vz 单节点）真实验收：
+
+- ✅ **Ingress**：ingress-nginx v1.12.1（baremetal 清单），`curl` 经 NodePort 验证 200 + 后端内容、错误 Host 404；
+- ✅ **存储**：local-path-provisioner v0.0.31，StorageClass 动态供给 + PVC 写入 → Pod 删除 → 同 PVC 读回 → Delete 回收闭环；
+- ✅ **监控**：metrics-server v0.9.0（`kubectl top` node/pod 真实指标）+ kube-prometheus-stack chart 88.3.0（Prometheus targets 10 up、Grafana 13.1.3 health OK）；
+- ⚠️ 如实标注：alertmanager 关闭（单节点无告警分发）；4 个控制面 metrics target 默认 down（kubeadm 未暴露端点）；Grafana 密码入 gitignored 本地 values。
 
 ### B3：HA 与升级证据
 
