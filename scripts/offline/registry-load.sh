@@ -33,10 +33,14 @@ command -v python3 >/dev/null 2>&1 || { echo "错误: 需要 python3（registry 
 parse_digest() {
   local ref="$1"
   if [[ "$ref" == *"@"* ]]; then
-    echo "${ref##*@}"
+    echo "${ref##*@}" | sed 's/^sha256://'
     return 0
   fi
-  ctr -n "$NS" i list 2>/dev/null | awk -v r="$ref" '$1==r {print $3; exit}'
+  # 注意：ctr i list 输出可能很大；awk 若提前 exit，ctr 写已关管道触发 SIGPIPE（141）。
+  # 这里不提前 exit（awk 全读），并对管道容忍 SIGPIPE。
+  { ctr -n "$NS" i list 2>/dev/null || true; } \
+    | awk -v r="$ref" '$1==r {print $3; found=1} END {if (found) exit 0; exit 1}' \
+    | sed 's/^sha256://' || true
 }
 DIGEST="$(parse_digest "$IMG")"
 if [ -z "$DIGEST" ]; then
@@ -46,11 +50,19 @@ if [ -z "$DIGEST" ]; then
 fi
 echo "==> $IMG digest=$DIGEST"
 
-# repo 名：registry 内路径（保留 / 结构，busybox 属 library/ 可省）
+# repo 名：registry 内路径（保留 / 结构；docker.io/ 官方镜像映射 library/，其余保留原路径）
 REPO="${IMG%@*}"            # 去 digest 部分
-REPO="${REPO#*/}"           # 去 registry 前缀
+if [[ "$REPO" == docker.io/* ]]; then
+  REPO="${REPO#docker.io/}"          # docker.io/rancher/local-path... → rancher/local-path...
+  if [[ "$REPO" != *"/"* ]]; then
+    REPO="library/${REPO}"           # docker.io/busybox → library/busybox
+  fi
+elif [[ "$REPO" == *"/"* ]]; then
+  REPO="${REPO#*/}"         # registry.k8s.io/x/y → x/y
+else
+  REPO="library/${REPO}"    # 裸镜像名（如 busybox）
+fi
 REPO="${REPO%%:*}"          # 去 tag
-[ "${REPO#library/}" = "$REPO" ] && REPO="library/$REPO"   # docker.io/x → library/x
 
 echo "==> 载入 -> $REG/$REPO (digest=$DIGEST)"
 
@@ -99,14 +111,23 @@ for d in objs:
         print(f"!! blob {d[:16]} 上传失败: {st}"); sys.exit(1)
     print(f"  [ok] blob {d[:16]}")
 
-# manifest：docker mediaType 提交（registry 2.8 兼容 OCI schema）
-mani_d = dict(mani)
-mani_d["mediaType"] = "application/vnd.docker.distribution.manifest.v2+json"
-tag = digest  # 用 digest 作不可变 tag，避免 tag 解析歧义
-st, _ = req("PUT", f"{REG}/v2/{repo}/manifests/{tag}",
+# manifest：docker mediaType 提交（registry 2.8 兼容 OCI schema）。
+# tag 取原镜像 tag（若无则用 digest 作不可变引用），保证 kubelet 按 tag resolve 命中。
+ORIG_TAG=""
+if [[ "$IMG" == *":"* && "$IMG" != *"@"* ]]; then
+  ORIG_TAG="${IMG##*:}"
+elif [[ "$IMG" == *"@"* ]]; then
+  ORIG_TAG=""
+fi
+if [ -n "$ORIG_TAG" ]; then
+  M_TAG="$ORIG_TAG"
+else
+  M_TAG="$digest"
+fi
+st, _ = req("PUT", f"{REG}/v2/{repo}/manifests/{M_TAG}",
             json.dumps(mani_d).encode(),
             "application/vnd.docker.distribution.manifest.v2+json")
 if st != 201:
     print(f"!! manifest 提交失败: {st}"); sys.exit(1)
-print(f"==> 完成: {REG}/v2/{repo}/manifests/{tag}")
+print(f"==> 完成: {REG}/v2/{repo}/manifests/{M_TAG}")
 PYEOF

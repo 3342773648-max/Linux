@@ -76,6 +76,31 @@ else
 fi
 
 echo "==> 3/4 配置 containerd mirrors（${REG} 作为 registry.k8s.io/quay.io/docker.io/rancher 上游）"
+# 关键：启用 config_path（containerd CRI 由此读取 certs.d/hosts.toml）。
+# 只改 cri.images 段（位于 [plugins.'io.containerd.cri.v1.images'.registry] 下），
+# 避免误伤 nri.plugin_config_path 与 transfer.config_path。
+python3 - <<'PYEOF'
+import re
+p = "/etc/containerd/config.toml"
+s = open(p).read()
+# 定位 cri 段内的 config_path（行首 6 空格缩进，紧随 cri registry 段）
+cri_section = "io.containerd.cri.v1.images"
+marker = f"[plugins.'{cri_section}'.registry]"
+if marker in s:
+    seg, rest = s.split(marker, 1)
+    # 段内第一个 config_path 行（格式:      config_path = '...' 或 "..."）
+    def repl(m):
+        return re.sub(r"config_path = ['\"][^'\"]*['\"]", 'config_path = "/etc/containerd/certs.d"', m.group(0), count=1)
+    # 精确到下一个 [plugins. 之前
+    next_sec = re.search(r"\n\s*\[plugins\.", rest)
+    scope = rest[:next_sec.start()] if next_sec else rest
+    fixed = re.sub(r"config_path = [^#\n]*", 'config_path = "/etc/containerd/certs.d"', scope, count=1)
+    open(p, "w").write(seg + marker + fixed + rest[next_sec.start():] if next_sec else seg + marker + fixed)
+    print("  [OK] cri.images.registry.config_path -> /etc/containerd/certs.d")
+else:
+    print("  [WARN] 未找到 cri registry 段，手动检查 config.toml")
+PYEOF
+
 mkdir -p "/etc/containerd/certs.d/${REG}"
 for src in registry.k8s.io quay.io docker.io rancher; do
   cat > "/etc/containerd/certs.d/${src}/hosts.toml" <<EOF

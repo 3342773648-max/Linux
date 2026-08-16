@@ -20,7 +20,7 @@ LIST_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 IMAGE_LIST="$LIST_DIR/images-list.txt"
 
 echo "==> 1/3 断网模拟检测（出站 443 阻断 + 内网 registry 可达）"
-if iptables -L OUTPUT -n 2>/dev/null | grep -q 'dpt:443.*DROP'; then
+if iptables -L OUTPUT -n 2>/dev/null | grep -E 'dpt:443|:443.*DROP|DROP.*443' | grep -i drop >/dev/null; then
   echo "  [OK] 出站 443 已被阻断（模拟断网生效）"
 else
   echo "  [WARN] 未检测到 443 阻断规则——请在离线 node 执行:"
