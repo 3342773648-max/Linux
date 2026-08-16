@@ -1,0 +1,58 @@
+# Day2 验收：echo 测试应用（验证 Ingress 路由真实可达）
+# 镜像选择说明：registry.k8s.io/echoserver 仅提供 amd64，本验收环境为 arm64（Lima vz），
+# 故采用 nginx:1.27-alpine（官方多架构镜像）；验收聚焦「路由 + 后端内容返回」语义。
+# 配套对象：Deployment + Service + Ingress（Host: echo.day2.example）
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: echo
+  namespace: default
+  labels:
+    app: echo
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: echo
+  template:
+    metadata:
+      labels:
+        app: echo
+    spec:
+      containers:
+        - name: echo
+          image: nginx:1.27-alpine
+          ports:
+            - containerPort: 80
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: echo
+  namespace: default
+spec:
+  selector:
+    app: echo
+  ports:
+    - name: http
+      port: 80
+      targetPort: 80
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: echo
+  namespace: default
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: echo.day2.example
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: echo
+                port:
+                  name: http

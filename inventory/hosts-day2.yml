@@ -1,0 +1,15 @@
+# Day2 验收 Inventory：bootstrap-day2（arm64 vz 单节点，独立实验网段——文档地址见下）
+# ⚠️ 仅用于本地实验，不得用于真实生产环境；真实连接在 host_vars/day2-cp/local.yml（gitignored）。
+
+all:
+  children:
+    k8s_cluster:
+      children:
+        control_plane:
+          hosts:
+            day2-cp:
+        worker:
+          hosts: {}
+    etcd:                       # stacked etcd（继承 control_plane）
+      children:
+        control_plane:
