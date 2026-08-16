@@ -9,6 +9,10 @@
     chmod a+r /etc/apt/keyrings/kubernetes-apt-keyring.asc
   args:
     creates: /etc/apt/keyrings/kubernetes-apt-keyring.asc
+  environment:
+    HTTP_PROXY: "{{ k8s_containerd_http_proxy | default(omit) }}"
+    HTTPS_PROXY: "{{ k8s_containerd_http_proxy | default(omit) }}"
+    NO_PROXY: "{{ k8s_containerd_no_proxy | default(omit) }}"
 
 - name: 添加 Kubernetes 官方 apt 源（v1.36 stable，deb822 格式）
   ansible.builtin.deb822_repository:
