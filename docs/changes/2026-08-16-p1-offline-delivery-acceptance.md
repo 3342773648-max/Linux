@@ -78,7 +78,7 @@ $ ./verify-offline.sh 127.0.0.1:5000
 ```
 $ ctr -n k8s.io i rm docker.io/library/busybox:1.36   # 清除本地引用
 $ kubectl apply -f offline-bb.yaml                     # 触发 kubelet 拉取
-$ kubectl get pod offline-bb-... 
+$ kubectl get pod offline-bb-...
 offline-bb-5c5497d97-4htt7   1/1   Running   0     39s
 $ kubectl logs offline-bb-5c5497d97-4htt7
 OFFLINE_PULL_OK
