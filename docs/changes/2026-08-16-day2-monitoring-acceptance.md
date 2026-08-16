@@ -80,3 +80,9 @@ Location: /login
 - ✅ 监控体系（metrics-server + Prometheus + Grafana + kube-state-metrics + node-exporter）部署并真实验收
 - ✅ `kubectl top` 真实指标、Prometheus targets UP、node 指标可查、Grafana 可达
 - 交付链路延伸：预检 → 部署 → CNI → Ingress → Storage → **监控** ✓
+
+## 已知限制（如实标注，审查补充）
+
+- **Prometheus 数据非持久化**：未配置 `storageSpec`，默认 emptyDir，Pod 重启后 TSDB 丢失（单节点验收可接受；需持久化时用 `storageClassName: local-path` + retention 覆盖，见 day2 storage 套件）。
+- **控制面 metrics 默认不可抓**：`kube-controller-manager`/`kube-scheduler` 绑定 127.0.0.1、etcd 需另配 `--listen-metrics-urls`、kube-proxy 需改 ConfigMap——完整处理需 kubeadm 配置 `extraArgs.bind-address: 0.0.0.0`（升级可保持），本套件如实标注为 4 个 down target。
+- **访问边界**：Grafana NodePort 30300 面向隔离网络；Prometheus 仅 ClusterIP（未暴露）；生产环境应配 NetworkPolicy 与认证层。

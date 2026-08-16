@@ -70,3 +70,8 @@ No resources found
 - ✅ local-path-provisioner v0.0.31 部署成功，StorageClass 就绪
 - ✅ **动态供给 + 持久化 + 回收的完整存储生命周期真实验证**
 - 交付链路延伸：预检 → 部署 → CNI → Ingress → **Storage** ✓
+
+## 已知限制（如实标注，审查补充）
+
+- **免 taint 单节点**：`day2-cp` 无 `control-plane` 污点（验收环境），provisioner 无需 toleration 即可调度；若用于带污点的 kubeadm 拓扑，DaemonSet 需补 toleration。
+- **数据不复制**：local-path 数据仅存节点本地目录，节点故障即丢失；单节点验收可接受，生产多节点应配对分布式存储（Longhorn/Rook 等）。

@@ -76,3 +76,8 @@ HTTP/1.1 404 Not Found
 - ✅ **HTTP 流量入口真实可用**：200 + 后端内容验证正向路由，404 验证精确匹配
 - ✅ Ingress 资源状态由 controller 自动更新（ADDRESS=192.0.2.10）
 - 交付链路延伸：预检 → 部署 → CNI →（HA）→ **Ingress** ✓
+
+## 已知限制（如实标注，审查补充）
+
+- **NodePort 无内建访问控制**：约 32310 对节点所有接口开放，需依赖外部防火墙/NetworkPolicy 限定来源；生产建议配 `externalTrafficPolicy: Local` 或 hostNetwork 方案（各自有取舍）。
+- **明文 HTTP**：验收用 HTTP 而非 TLS（lab 预期）；生产应配置证书（自签可信链或 cert-manager + Let's Encrypt）并启用 ingress-nginx 的 TLS redirect。
