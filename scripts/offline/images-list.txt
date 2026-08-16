@@ -1,0 +1,44 @@
+# P1 离线交付链必需镜像清单（版本与实际运行集群一致）
+# 来源：bootstrap-day2（kubeadm 1.36.2 + Calico 3.32.1 + Day2 套件）实际运行镜像
+# 注意：kubeadm config images list 默认输出 1.36.3，此处按实际部署的 1.36.2 固定
+
+# --- 控制面（kubeadm v1.36.2）---
+registry.k8s.io/kube-apiserver:v1.36.2
+registry.k8s.io/kube-controller-manager:v1.36.2
+registry.k8s.io/kube-scheduler:v1.36.2
+registry.k8s.io/kube-proxy:v1.36.2
+registry.k8s.io/coredns/coredns:v1.14.2
+registry.k8s.io/pause:3.10.2
+registry.k8s.io/etcd:3.6.8-0
+
+# --- CNI：Calico v3.32.1（tigera-operator 方式）---
+quay.io/tigera/operator:v1.42.3
+quay.io/calico/node:v3.32.1
+quay.io/calico/cni:v3.32.1
+quay.io/calico/kube-controllers:v3.32.1
+quay.io/calico/typha:v3.32.1
+quay.io/calico/apiserver:v3.32.1
+quay.io/calico/csi:v3.32.1
+quay.io/calico/node-driver-registrar:v3.32.1
+quay.io/calico/pod2daemon-flexvol:v3.32.1
+
+# --- Day2：ingress-nginx v1.12.1 ---
+registry.k8s.io/ingress-nginx/controller:v1.12.1
+registry.k8s.io/ingress-nginx/kube-webhook-certgen:v1.5.2
+
+# --- Day2：local-path-provisioner v0.0.31 ---
+# 注：containerd 实际以 docker.io 前缀存储（runc 拉取时自动补全）
+docker.io/rancher/local-path-provisioner:v0.0.31
+
+# --- Day2：监控（kube-prometheus-stack 88.3.0 / app v0.93.0 + metrics-server v0.9.0）---
+registry.k8s.io/metrics-server/metrics-server:v0.9.0
+quay.io/prometheus-operator/prometheus-operator:v0.93.0
+quay.io/prometheus-operator/prometheus-config-reloader:v0.93.0
+quay.io/prometheus/prometheus:v3.13.2-distroless
+quay.io/prometheus/node-exporter:v1.12.1-distroless
+#   ↑ 已知问题：上游 quay 该 tag 的 arm64 manifest 引用一个 registry 端缺失的层
+#     （2026-08-16 实测），ctr export 无法导出；离线侧需从内网 registry 拉取或在
+#     镜像站选用完整 variant。属如实标注的上游缺陷，不影响本机运行。
+registry.k8s.io/kube-state-metrics/kube-state-metrics:v2.19.1
+docker.io/grafana/grafana:13.1.3
+quay.io/kiwigrid/k8s-sidecar:2.10.1
